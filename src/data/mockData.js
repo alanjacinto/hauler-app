@@ -1,0 +1,247 @@
+import { JOB_STATUS, PRIORITY, ROLES, TRUCK_STATUS } from '../utils/constants';
+
+export const companies = [
+  {
+    id: 'company-1',
+    name: 'Northstar Logistics',
+  },
+  {
+    id: 'company-2',
+    name: 'Bay Freight',
+  },
+  {
+    id: 'company-3',
+    name: 'Summit Parcel',
+  },
+];
+
+export const warehouses = [
+  {
+    id: 'warehouse-1',
+    companyId: 'company-1',
+    name: 'Oakland Hub',
+    address: '1450 Maritime St, Oakland, CA',
+  },
+  {
+    id: 'warehouse-2',
+    companyId: 'company-1',
+    name: 'Berkeley Station',
+    address: '2201 Second St, Berkeley, CA',
+  },
+  {
+    id: 'warehouse-3',
+    companyId: 'company-2',
+    name: 'San Leandro Yard',
+    address: '1985 Williams St, San Leandro, CA',
+  },
+  {
+    id: 'warehouse-4',
+    companyId: 'company-3',
+    name: 'Richmond Depot',
+    address: '420 Harbour Way, Richmond, CA',
+  },
+];
+
+export const users = [
+  {
+    id: 'user-1',
+    role: ROLES.MANAGER,
+    name: 'Daniel Cruz',
+    companyId: 'company-1',
+  },
+  {
+    id: 'user-2',
+    role: ROLES.MANAGER,
+    name: 'Maya Foster',
+    companyId: 'company-2',
+  },
+  {
+    id: 'user-3',
+    role: ROLES.SECRETARY,
+    name: 'Elena Torres',
+    companyId: null,
+  },
+  {
+    id: 'user-4',
+    role: ROLES.MECHANIC,
+    name: 'Luis Ortega',
+    companyId: null,
+  },
+  {
+    id: 'user-5',
+    role: ROLES.MECHANIC,
+    name: 'Chris Bennett',
+    companyId: null,
+  },
+  {
+    id: 'user-6',
+    role: ROLES.MECHANIC,
+    name: 'Aiden Brooks',
+    companyId: null,
+  },
+];
+
+export const trucks = [
+  {
+    id: 'truck-1',
+    unitNumber: '231',
+    vin: '1FTFW1E50JFC12345',
+    companyId: 'company-1',
+    warehouseId: 'warehouse-1',
+    status: TRUCK_STATUS.OUT_OF_SERVICE,
+  },
+  {
+    id: 'truck-2',
+    unitNumber: '145',
+    vin: '1FTFW1E50JFC67890',
+    companyId: 'company-1',
+    warehouseId: 'warehouse-1',
+    status: TRUCK_STATUS.IN_REPAIR,
+  },
+  {
+    id: 'truck-3',
+    unitNumber: '188',
+    vin: '1FTFW1E50JFC11111',
+    companyId: 'company-1',
+    warehouseId: 'warehouse-2',
+    status: TRUCK_STATUS.BACK_IN_SERVICE,
+  },
+  {
+    id: 'truck-4',
+    unitNumber: '402',
+    vin: '1FTFW1E50JFC22222',
+    companyId: 'company-2',
+    warehouseId: 'warehouse-3',
+    status: TRUCK_STATUS.BACK_IN_SERVICE,
+  },
+  {
+    id: 'truck-5',
+    unitNumber: '512',
+    vin: '1FTFW1E50JFC33333',
+    companyId: 'company-2',
+    warehouseId: 'warehouse-3',
+    status: TRUCK_STATUS.OUT_OF_SERVICE,
+  },
+  {
+    id: 'truck-6',
+    unitNumber: '640',
+    vin: '1FTFW1E50JFC44444',
+    companyId: 'company-3',
+    warehouseId: 'warehouse-4',
+    status: TRUCK_STATUS.IN_REPAIR,
+  },
+  {
+    id: 'truck-7',
+    unitNumber: '711',
+    vin: '1FTFW1E50JFC55555',
+    companyId: 'company-3',
+    warehouseId: 'warehouse-4',
+    status: TRUCK_STATUS.BACK_IN_SERVICE,
+  },
+];
+
+export const issues = [
+  {
+    id: 'issue-1',
+    truckId: 'truck-1',
+    reportedBy: 'user-1',
+    description: 'Brake warning light on and reduced stopping power reported after morning route.',
+    photoUrl: null,
+    priority: PRIORITY.URGENT,
+    createdAt: '2026-03-13T08:10:00.000Z',
+    status: JOB_STATUS.SCHEDULED,
+  },
+  {
+    id: 'issue-2',
+    truckId: 'truck-2',
+    reportedBy: 'user-1',
+    description: 'Coolant leak under engine bay. Truck was removed from service at warehouse.',
+    photoUrl: null,
+    priority: PRIORITY.URGENT,
+    createdAt: '2026-03-12T17:40:00.000Z',
+    status: JOB_STATUS.IN_PROGRESS,
+  },
+  {
+    id: 'issue-3',
+    truckId: 'truck-5',
+    reportedBy: 'user-2',
+    description: 'Liftgate stops halfway during unload and needs electrical diagnostics.',
+    photoUrl: null,
+    priority: PRIORITY.NORMAL,
+    createdAt: '2026-03-13T15:20:00.000Z',
+    status: JOB_STATUS.SCHEDULED,
+  },
+  {
+    id: 'issue-4',
+    truckId: 'truck-6',
+    reportedBy: 'user-2',
+    description: 'Starter intermittently fails. Mechanic requested follow-up visit tomorrow morning.',
+    photoUrl: null,
+    priority: PRIORITY.NORMAL,
+    createdAt: '2026-03-12T20:15:00.000Z',
+    status: JOB_STATUS.IN_PROGRESS,
+  },
+  {
+    id: 'issue-5',
+    truckId: 'truck-3',
+    reportedBy: 'user-1',
+    description: 'Cabin AC not cooling consistently during afternoon shift.',
+    photoUrl: null,
+    priority: PRIORITY.LOW,
+    createdAt: '2026-03-11T13:00:00.000Z',
+    status: JOB_STATUS.DONE,
+  },
+];
+
+export const jobs = [
+  {
+    id: 'job-1',
+    issueId: 'issue-1',
+    truckId: 'truck-1',
+    warehouseId: 'warehouse-1',
+    assignedMechanicId: 'user-4',
+    scheduledDate: '2026-03-13',
+    estimatedReturnDate: '2026-03-14',
+    status: JOB_STATUS.SCHEDULED,
+  },
+  {
+    id: 'job-2',
+    issueId: 'issue-2',
+    truckId: 'truck-2',
+    warehouseId: 'warehouse-1',
+    assignedMechanicId: 'user-5',
+    scheduledDate: '2026-03-13',
+    estimatedReturnDate: '2026-03-13',
+    status: JOB_STATUS.IN_PROGRESS,
+  },
+  {
+    id: 'job-3',
+    issueId: 'issue-3',
+    truckId: 'truck-5',
+    warehouseId: 'warehouse-3',
+    assignedMechanicId: 'user-6',
+    scheduledDate: '2026-03-14',
+    estimatedReturnDate: '2026-03-15',
+    status: JOB_STATUS.SCHEDULED,
+  },
+  {
+    id: 'job-4',
+    issueId: 'issue-4',
+    truckId: 'truck-6',
+    warehouseId: 'warehouse-4',
+    assignedMechanicId: 'user-4',
+    scheduledDate: '2026-03-14',
+    estimatedReturnDate: '2026-03-14',
+    status: JOB_STATUS.IN_PROGRESS,
+  },
+  {
+    id: 'job-5',
+    issueId: 'issue-5',
+    truckId: 'truck-3',
+    warehouseId: 'warehouse-2',
+    assignedMechanicId: 'user-5',
+    scheduledDate: '2026-03-12',
+    estimatedReturnDate: '2026-03-12',
+    status: JOB_STATUS.DONE,
+  },
+];

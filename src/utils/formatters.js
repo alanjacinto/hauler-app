@@ -1,0 +1,38 @@
+import { JOB_STATUS_LABELS, PRIORITY_LABELS, TRUCK_STATUS_LABELS } from './constants';
+
+export function formatDateTime(value) {
+  if (!value) {
+    return 'Not available';
+  }
+
+  return new Intl.DateTimeFormat('en-US', {
+    month: 'short',
+    day: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+  }).format(new Date(value));
+}
+
+export function formatDateLabel(value) {
+  if (!value) {
+    return 'Not scheduled';
+  }
+
+  return new Intl.DateTimeFormat('en-US', {
+    weekday: 'short',
+    month: 'short',
+    day: 'numeric',
+  }).format(new Date(`${value}T12:00:00`));
+}
+
+export function getTruckStatusLabel(status) {
+  return TRUCK_STATUS_LABELS[status] || status;
+}
+
+export function getJobStatusLabel(status) {
+  return JOB_STATUS_LABELS[status] || status;
+}
+
+export function getPriorityLabel(priority) {
+  return PRIORITY_LABELS[priority] || priority;
+}
