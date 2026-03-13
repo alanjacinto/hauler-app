@@ -1,7 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import colors from '../theme/colors';
-import { formatDateTime } from '../utils/formatters';
+import { formatDateTime, getJobStatusLabel } from '../utils/formatters';
 import StatusBadge from './StatusBadge';
 
 export default function IssueCard({ issue, onPressTruck, onPressSchedule }) {
@@ -32,6 +32,15 @@ export default function IssueCard({ issue, onPressTruck, onPressSchedule }) {
         <Text style={styles.infoValue}>{issue.reporter?.name}</Text>
       </View>
 
+      <View style={styles.infoRow}>
+        <Text style={styles.infoLabel}>Workshop</Text>
+        <Text style={styles.infoValue}>
+          {issue.currentJob
+            ? `${issue.currentJob.mechanic?.name} • ${getJobStatusLabel(issue.currentJob.status)}`
+            : 'Not scheduled yet'}
+        </Text>
+      </View>
+
       <View style={styles.footer}>
         <Pressable style={styles.secondaryButton} onPress={onPressTruck}>
           <Ionicons name="car-outline" size={16} color={colors.text} />
@@ -41,7 +50,7 @@ export default function IssueCard({ issue, onPressTruck, onPressSchedule }) {
         <Pressable style={styles.primaryButton} onPress={onPressSchedule}>
           <Ionicons name="calendar-outline" size={16} color={colors.text} />
           <Text style={styles.primaryText}>
-            {issue.job ? 'View schedule' : 'Create job'}
+            {issue.currentJob ? 'View schedule' : 'Create job'}
           </Text>
         </Pressable>
       </View>

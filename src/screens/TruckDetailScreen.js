@@ -12,7 +12,7 @@ function DetailCard({ children }) {
 }
 
 export default function TruckDetailScreen({ route }) {
-  const { getTruckById, issues, jobs } = useAppData();
+  const { getTruckById, getCurrentIssueForTruck, getCurrentJobForTruck } = useAppData();
   const truckId = route.params?.truckId;
   const truck = getTruckById(truckId);
 
@@ -24,8 +24,8 @@ export default function TruckDetailScreen({ route }) {
     );
   }
 
-  const currentIssue = issues.find((issue) => issue.truck?.id === truck.id) || null;
-  const currentJob = jobs.find((job) => job.truck?.id === truck.id) || null;
+  const currentIssue = getCurrentIssueForTruck(truck.id);
+  const currentJob = getCurrentJobForTruck(truck.id);
 
   return (
     <ScrollView

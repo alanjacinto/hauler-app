@@ -10,6 +10,12 @@ export const TRUCK_STATUS = {
   BACK_IN_SERVICE: 'BACK_IN_SERVICE',
 };
 
+export const ISSUE_STATUS = {
+  REPORTED: 'REPORTED',
+  ASSIGNED: 'ASSIGNED',
+  RESOLVED: 'RESOLVED',
+};
+
 export const JOB_STATUS = {
   SCHEDULED: 'SCHEDULED',
   IN_PROGRESS: 'IN_PROGRESS',
@@ -40,6 +46,12 @@ export const TRUCK_STATUS_OPTIONS = [
     value: TRUCK_STATUS.BACK_IN_SERVICE,
   },
 ];
+
+export const ISSUE_STATUS_LABELS = {
+  [ISSUE_STATUS.REPORTED]: 'Reported',
+  [ISSUE_STATUS.ASSIGNED]: 'Assigned',
+  [ISSUE_STATUS.RESOLVED]: 'Resolved',
+};
 
 export const JOB_STATUS_LABELS = {
   [JOB_STATUS.SCHEDULED]: 'Scheduled',

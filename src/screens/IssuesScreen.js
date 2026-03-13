@@ -5,14 +5,14 @@ import ScreenHeader from '../components/ScreenHeader';
 import SummaryCard from '../components/SummaryCard';
 import { useAppData } from '../context/AppContext';
 import colors from '../theme/colors';
-import { JOB_STATUS, PRIORITY } from '../utils/constants';
+import { ISSUE_STATUS, PRIORITY } from '../utils/constants';
 
 export default function IssuesScreen({ navigation }) {
   const { issues } = useAppData();
 
   const urgentCount = issues.filter((issue) => issue.priority === PRIORITY.URGENT).length;
-  const scheduledCount = issues.filter((issue) => issue.status === JOB_STATUS.SCHEDULED).length;
-  const inProgressCount = issues.filter((issue) => issue.status === JOB_STATUS.IN_PROGRESS).length;
+  const reportedCount = issues.filter((issue) => issue.status === ISSUE_STATUS.REPORTED).length;
+  const assignedCount = issues.filter((issue) => issue.status === ISSUE_STATUS.ASSIGNED).length;
 
   return (
     <View style={styles.container}>
@@ -25,13 +25,13 @@ export default function IssuesScreen({ navigation }) {
           <View style={styles.headerBlock}>
             <ScreenHeader
               title="Issues"
-              subtitle="Reported problems flow into one queue so the workshop can schedule, assign, and follow every truck."
+              subtitle="Managers report problems here first. The workshop then assigns work and moves the repair through schedule and execution."
             />
 
             <View style={styles.summaryRow}>
               <SummaryCard label="Urgent issues" value={urgentCount} tone="danger" />
-              <SummaryCard label="Scheduled" value={scheduledCount} tone="neutral" />
-              <SummaryCard label="In progress" value={inProgressCount} tone="warning" />
+              <SummaryCard label="Reported" value={reportedCount} tone="warning" />
+              <SummaryCard label="Assigned" value={assignedCount} tone="neutral" />
             </View>
           </View>
         }

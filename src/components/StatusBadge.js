@@ -1,6 +1,11 @@
 import { StyleSheet, Text, View } from 'react-native';
-import { JOB_STATUS, PRIORITY, TRUCK_STATUS } from '../utils/constants';
-import { getJobStatusLabel, getPriorityLabel, getTruckStatusLabel } from '../utils/formatters';
+import { ISSUE_STATUS, JOB_STATUS, PRIORITY, TRUCK_STATUS } from '../utils/constants';
+import {
+  getIssueStatusLabel,
+  getJobStatusLabel,
+  getPriorityLabel,
+  getTruckStatusLabel,
+} from '../utils/formatters';
 import colors from '../theme/colors';
 
 const BADGE_CONFIG = {
@@ -18,6 +23,24 @@ const BADGE_CONFIG = {
   },
   [TRUCK_STATUS.BACK_IN_SERVICE]: {
     label: getTruckStatusLabel(TRUCK_STATUS.BACK_IN_SERVICE),
+    backgroundColor: colors.successMuted,
+    borderColor: colors.success,
+    textColor: colors.success,
+  },
+  [ISSUE_STATUS.REPORTED]: {
+    label: getIssueStatusLabel(ISSUE_STATUS.REPORTED),
+    backgroundColor: colors.dangerMuted,
+    borderColor: colors.danger,
+    textColor: colors.danger,
+  },
+  [ISSUE_STATUS.ASSIGNED]: {
+    label: getIssueStatusLabel(ISSUE_STATUS.ASSIGNED),
+    backgroundColor: colors.primaryMuted,
+    borderColor: colors.primary,
+    textColor: colors.primary,
+  },
+  [ISSUE_STATUS.RESOLVED]: {
+    label: getIssueStatusLabel(ISSUE_STATUS.RESOLVED),
     backgroundColor: colors.successMuted,
     borderColor: colors.success,
     textColor: colors.success,

@@ -1,4 +1,10 @@
-import { JOB_STATUS, PRIORITY, ROLES, TRUCK_STATUS } from '../utils/constants';
+import {
+  ISSUE_STATUS,
+  JOB_STATUS,
+  PRIORITY,
+  ROLES,
+  TRUCK_STATUS,
+} from '../utils/constants';
 
 export const companies = [
   {
@@ -149,7 +155,7 @@ export const issues = [
     photoUrl: null,
     priority: PRIORITY.URGENT,
     createdAt: '2026-03-13T08:10:00.000Z',
-    status: JOB_STATUS.SCHEDULED,
+    status: ISSUE_STATUS.ASSIGNED,
   },
   {
     id: 'issue-2',
@@ -159,7 +165,7 @@ export const issues = [
     photoUrl: null,
     priority: PRIORITY.URGENT,
     createdAt: '2026-03-12T17:40:00.000Z',
-    status: JOB_STATUS.IN_PROGRESS,
+    status: ISSUE_STATUS.ASSIGNED,
   },
   {
     id: 'issue-3',
@@ -169,7 +175,7 @@ export const issues = [
     photoUrl: null,
     priority: PRIORITY.NORMAL,
     createdAt: '2026-03-13T15:20:00.000Z',
-    status: JOB_STATUS.SCHEDULED,
+    status: ISSUE_STATUS.ASSIGNED,
   },
   {
     id: 'issue-4',
@@ -179,7 +185,7 @@ export const issues = [
     photoUrl: null,
     priority: PRIORITY.NORMAL,
     createdAt: '2026-03-12T20:15:00.000Z',
-    status: JOB_STATUS.IN_PROGRESS,
+    status: ISSUE_STATUS.ASSIGNED,
   },
   {
     id: 'issue-5',
@@ -189,7 +195,17 @@ export const issues = [
     photoUrl: null,
     priority: PRIORITY.LOW,
     createdAt: '2026-03-11T13:00:00.000Z',
-    status: JOB_STATUS.DONE,
+    status: ISSUE_STATUS.RESOLVED,
+  },
+  {
+    id: 'issue-6',
+    truckId: 'truck-7',
+    reportedBy: 'user-2',
+    description: 'Pre-trip inspection found a loose mirror housing. No downtime scheduled yet.',
+    photoUrl: null,
+    priority: PRIORITY.LOW,
+    createdAt: '2026-03-13T09:05:00.000Z',
+    status: ISSUE_STATUS.REPORTED,
   },
 ];
 

@@ -1,4 +1,9 @@
-import { JOB_STATUS_LABELS, PRIORITY_LABELS, TRUCK_STATUS_LABELS } from './constants';
+import {
+  ISSUE_STATUS_LABELS,
+  JOB_STATUS_LABELS,
+  PRIORITY_LABELS,
+  TRUCK_STATUS_LABELS,
+} from './constants';
 
 export function formatDateTime(value) {
   if (!value) {
@@ -27,6 +32,10 @@ export function formatDateLabel(value) {
 
 export function getTruckStatusLabel(status) {
   return TRUCK_STATUS_LABELS[status] || status;
+}
+
+export function getIssueStatusLabel(status) {
+  return ISSUE_STATUS_LABELS[status] || status;
 }
 
 export function getJobStatusLabel(status) {
