@@ -10,7 +10,14 @@ import colors from '../theme/colors';
 import { ISSUE_STATUS, PRIORITY } from '../utils/constants';
 
 export default function IssuesScreen({ navigation }) {
-  const { assignIssueToJob, issues, mechanics, warehouses } = useAppData();
+  const {
+    assignIssueToJob,
+    currentUser,
+    issues,
+    isWorkshopUser,
+    mechanics,
+    warehouses,
+  } = useAppData();
   const [selectedIssue, setSelectedIssue] = useState(null);
   const [isAssignModalVisible, setIsAssignModalVisible] = useState(false);
 
@@ -52,9 +59,8 @@ export default function IssuesScreen({ navigation }) {
           <View style={styles.headerBlock}>
             <ScreenHeader
               title="Issues"
-              subtitle="Managers report problems here first. The workshop then assigns work and moves the repair through schedule and execution."
+              subtitle={`Logged in as ${currentUser?.name}. Triage reported problems, assign repairs, and move work into the shop schedule.`}
             />
-
             <View style={styles.summaryRow}>
               <SummaryCard label="Urgent issues" value={urgentCount} tone="danger" />
               <SummaryCard label="Reported" value={reportedCount} tone="warning" />
@@ -71,8 +77,9 @@ export default function IssuesScreen({ navigation }) {
         }
         ItemSeparatorComponent={() => <View style={styles.separator} />}
         renderItem={({ item }) => {
-          const canAssign = item.status === ISSUE_STATUS.REPORTED;
-          const canViewSchedule = item.status !== ISSUE_STATUS.REPORTED && Boolean(item.currentJob);
+          const canAssign = isWorkshopUser && item.status === ISSUE_STATUS.REPORTED;
+          const canViewSchedule =
+            item.status !== ISSUE_STATUS.REPORTED && Boolean(item.currentJob);
 
           return (
             <IssueCard

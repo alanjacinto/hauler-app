@@ -5,8 +5,15 @@ import colors from '../theme/colors';
 import { formatDateLabel } from '../utils/formatters';
 import StatusBadge from './StatusBadge';
 
-export default function ScheduleCard({ job, onPress, onPressWorkflow }) {
-  const showWorkflowAction = job.status === JOB_STATUS.SCHEDULED || job.status === JOB_STATUS.IN_PROGRESS;
+export default function ScheduleCard({
+  job,
+  onPress,
+  onPressWorkflow,
+  showWorkflowAction = true,
+}) {
+  const canRunWorkflow =
+    showWorkflowAction &&
+    (job.status === JOB_STATUS.SCHEDULED || job.status === JOB_STATUS.IN_PROGRESS);
 
   return (
     <View style={styles.card}>
@@ -40,7 +47,7 @@ export default function ScheduleCard({ job, onPress, onPressWorkflow }) {
         </View>
       </Pressable>
 
-      {showWorkflowAction ? (
+      {canRunWorkflow ? (
         <Pressable style={styles.workflowButton} onPress={onPressWorkflow}>
           <Ionicons
             name={job.status === JOB_STATUS.SCHEDULED ? 'play-outline' : 'checkmark-circle-outline'}

@@ -7,7 +7,7 @@ import {
   users,
   warehouses,
 } from '../data/mockData';
-import { ISSUE_STATUS, JOB_STATUS, ROLES, TRUCK_STATUS } from '../utils/constants';
+import { ISSUE_STATUS, JOB_STATUS, PRIORITY, ROLES, TRUCK_STATUS } from '../utils/constants';
 
 const AppContext = createContext(null);
 
@@ -82,8 +82,8 @@ function getCurrentJob(jobsForTruck) {
   return activeJob || prioritizedJobs[0];
 }
 
-function createJobId() {
-  return `job-${Date.now()}`;
+function createEntityId(prefix) {
+  return `${prefix}-${Date.now()}`;
 }
 
 function getTruckActivity(truck, issuesForTruck, jobsForTruck) {
@@ -150,12 +150,46 @@ function getTruckActivity(truck, issuesForTruck, jobsForTruck) {
   return sortByDateDescending([...issueEvents, ...jobEvents], 'occurredAt');
 }
 
+function getVisibleEntities(currentUser, trucks, issues, jobs) {
+  if (!currentUser) {
+    return {
+      trucks: [],
+      issues: [],
+      jobs: [],
+    };
+  }
+
+  if (currentUser.role !== ROLES.MANAGER) {
+    return {
+      trucks,
+      issues,
+      jobs,
+    };
+  }
+
+  const visibleTrucks = trucks.filter((truck) => truck.companyId === currentUser.companyId);
+  const visibleTruckIds = new Set(visibleTrucks.map((truck) => truck.id));
+
+  return {
+    trucks: visibleTrucks,
+    issues: issues.filter((issue) => visibleTruckIds.has(issue.truckId)),
+    jobs: jobs.filter((job) => visibleTruckIds.has(job.truckId)),
+  };
+}
+
 export function AppProvider({ children }) {
   const [trucksState, setTrucksState] = useState(initialTrucks);
   const [issuesState, setIssuesState] = useState(initialIssues);
   const [jobsState, setJobsState] = useState(initialJobs);
+  const [currentUserId, setCurrentUserId] = useState(null);
 
+  const currentUser = users.find((user) => user.id === currentUserId) || null;
+  const isManager = currentUser?.role === ROLES.MANAGER;
+  const isWorkshopUser = Boolean(currentUser) && currentUser.role !== ROLES.MANAGER;
   const mechanics = users.filter((user) => user.role === ROLES.MECHANIC);
+  const sessionUsers = users.filter(
+    (user) => user.role === ROLES.MANAGER || user.role === ROLES.SECRETARY || user.role === ROLES.MECHANIC
+  );
 
   const derivedData = useMemo(() => {
     const companiesById = mapById(companies);
@@ -291,9 +325,20 @@ export function AppProvider({ children }) {
       };
     });
 
-    const trucksResolvedById = mapById(trucksWithResolvedRelations);
+    const allTrucksById = mapById(trucksWithResolvedRelations);
+    const allIssuesById = mapById(issuesDetailed);
+    const allJobsById = mapById(jobsWithIssueDetails);
+    const visibleEntities = getVisibleEntities(
+      currentUser,
+      trucksWithResolvedRelations,
+      issuesDetailed,
+      jobsWithIssueDetails
+    );
+    const visibleTrucksById = mapById(visibleEntities.trucks);
+    const visibleIssuesById = mapById(visibleEntities.issues);
+    const visibleJobsById = mapById(visibleEntities.jobs);
 
-    const scheduleDays = jobsWithIssueDetails.reduce((accumulator, job) => {
+    const scheduleDays = visibleEntities.jobs.reduce((accumulator, job) => {
       const existingDay = accumulator.find((item) => item.date === job.scheduledDate);
 
       if (existingDay) {
@@ -310,32 +355,80 @@ export function AppProvider({ children }) {
     }, []);
 
     const fleetSummary = {
-      total: trucksWithResolvedRelations.length,
-      outOfService: trucksWithResolvedRelations.filter(
+      total: visibleEntities.trucks.length,
+      outOfService: visibleEntities.trucks.filter(
         (truck) => truck.status === TRUCK_STATUS.OUT_OF_SERVICE
       ).length,
-      inRepair: trucksWithResolvedRelations.filter(
+      inRepair: visibleEntities.trucks.filter(
         (truck) => truck.status === TRUCK_STATUS.IN_REPAIR
       ).length,
-      backInService: trucksWithResolvedRelations.filter(
+      backInService: visibleEntities.trucks.filter(
         (truck) => truck.status === TRUCK_STATUS.BACK_IN_SERVICE
       ).length,
-      attentionNow: trucksWithResolvedRelations.filter(
+      attentionNow: visibleEntities.trucks.filter(
         (truck) => truck.activeIssue || truck.activeJob
       ).length,
     };
 
     return {
-      trucks: trucksWithResolvedRelations,
-      issues: issuesDetailed,
-      jobs: jobsWithIssueDetails,
+      allTrucksById,
+      allIssuesById,
+      allJobsById,
+      trucks: visibleEntities.trucks,
+      issues: visibleEntities.issues,
+      jobs: visibleEntities.jobs,
       scheduleDays,
       fleetSummary,
-      trucksResolvedById,
-      issuesDetailedById,
-      jobsById,
+      visibleTrucksById,
+      visibleIssuesById,
+      visibleJobsById,
     };
-  }, [issuesState, jobsState, trucksState]);
+  }, [currentUser, issuesState, jobsState, trucksState]);
+
+  const loginAsUser = (userId) => {
+    setCurrentUserId(userId);
+  };
+
+  const logout = () => {
+    setCurrentUserId(null);
+  };
+
+  const reportIssue = ({ truckId, description, priority = PRIORITY.NORMAL, photoUrl = null }) => {
+    if (!currentUser || currentUser.role !== ROLES.MANAGER) {
+      return null;
+    }
+
+    const truck = trucksState.find((item) => item.id === truckId);
+
+    if (!truck) {
+      return null;
+    }
+
+    const newIssue = {
+      id: createEntityId('issue'),
+      truckId,
+      reportedBy: currentUser.id,
+      description: description.trim(),
+      photoUrl,
+      priority,
+      createdAt: new Date().toISOString(),
+      status: ISSUE_STATUS.REPORTED,
+    };
+
+    setIssuesState((currentIssues) => [newIssue, ...currentIssues]);
+    setTrucksState((currentTrucks) =>
+      currentTrucks.map((currentTruck) =>
+        currentTruck.id === truckId
+          ? {
+              ...currentTruck,
+              status: TRUCK_STATUS.OUT_OF_SERVICE,
+            }
+          : currentTruck
+      )
+    );
+
+    return newIssue.id;
+  };
 
   const assignIssueToJob = ({
     issueId,
@@ -346,12 +439,12 @@ export function AppProvider({ children }) {
   }) => {
     const issue = issuesState.find((item) => item.id === issueId);
 
-    if (!issue || issue.status !== ISSUE_STATUS.REPORTED) {
+    if (!issue || issue.status !== ISSUE_STATUS.REPORTED || !isWorkshopUser) {
       return null;
     }
 
     const newJob = {
-      id: createJobId(),
+      id: createEntityId('job'),
       issueId,
       truckId: issue.truckId,
       warehouseId,
@@ -403,7 +496,7 @@ export function AppProvider({ children }) {
   const updateJobStatus = (jobId, status) => {
     const targetJob = jobsState.find((job) => job.id === jobId);
 
-    if (!targetJob) {
+    if (!targetJob || !isWorkshopUser) {
       return;
     }
 
@@ -430,7 +523,7 @@ export function AppProvider({ children }) {
   const resolveIssue = (issueId) => {
     const targetIssue = issuesState.find((issue) => issue.id === issueId);
 
-    if (!targetIssue) {
+    if (!targetIssue || !isWorkshopUser) {
       return;
     }
 
@@ -460,7 +553,7 @@ export function AppProvider({ children }) {
   const completeJobWorkflow = (jobId) => {
     const targetJob = jobsState.find((job) => job.id === jobId);
 
-    if (!targetJob) {
+    if (!targetJob || !isWorkshopUser) {
       return;
     }
 
@@ -472,31 +565,38 @@ export function AppProvider({ children }) {
     warehouses,
     users,
     mechanics,
+    sessionUsers,
+    currentUser,
+    currentRole: currentUser?.role || null,
+    isAuthenticated: Boolean(currentUser),
+    isManager,
+    isWorkshopUser,
     trucks: derivedData.trucks,
     issues: derivedData.issues,
     jobs: derivedData.jobs,
     scheduleDays: derivedData.scheduleDays,
     fleetSummary: derivedData.fleetSummary,
+    loginAsUser,
+    logout,
+    reportIssue,
     assignIssueToJob,
     updateJobStatus,
     resolveIssue,
     updateTruckStatus,
     completeJobWorkflow,
-    getTruckById: (truckId) => derivedData.trucksResolvedById[truckId] || null,
-    getIssueById: (issueId) => derivedData.issuesDetailedById[issueId] || null,
-    getJobById: (jobId) => derivedData.jobsById[jobId] || null,
+    getTruckById: (truckId) => derivedData.visibleTrucksById[truckId] || null,
+    getIssueById: (issueId) => derivedData.visibleIssuesById[issueId] || null,
+    getJobById: (jobId) => derivedData.visibleJobsById[jobId] || null,
     getJobsForDate: (date) => derivedData.jobs.filter((job) => job.scheduledDate === date),
-    getIssuesForTruck: (truckId) => derivedData.trucksResolvedById[truckId]?.issues || [],
-    getJobsForTruck: (truckId) => derivedData.trucksResolvedById[truckId]?.jobs || [],
-    getCurrentIssueForTruck: (truckId) =>
-      derivedData.trucksResolvedById[truckId]?.currentIssue || null,
-    getCurrentJobForTruck: (truckId) => derivedData.trucksResolvedById[truckId]?.currentJob || null,
-    getActiveIssueForTruck: (truckId) => derivedData.trucksResolvedById[truckId]?.activeIssue || null,
-    getActiveJobForTruck: (truckId) => derivedData.trucksResolvedById[truckId]?.activeJob || null,
-    getRecentIssuesForTruck: (truckId) =>
-      derivedData.trucksResolvedById[truckId]?.recentIssues || [],
-    getRecentJobsForTruck: (truckId) => derivedData.trucksResolvedById[truckId]?.recentJobs || [],
-    getTruckActivity: (truckId) => derivedData.trucksResolvedById[truckId]?.activity || [],
+    getIssuesForTruck: (truckId) => derivedData.allTrucksById[truckId]?.issues || [],
+    getJobsForTruck: (truckId) => derivedData.allTrucksById[truckId]?.jobs || [],
+    getCurrentIssueForTruck: (truckId) => derivedData.allTrucksById[truckId]?.currentIssue || null,
+    getCurrentJobForTruck: (truckId) => derivedData.allTrucksById[truckId]?.currentJob || null,
+    getActiveIssueForTruck: (truckId) => derivedData.allTrucksById[truckId]?.activeIssue || null,
+    getActiveJobForTruck: (truckId) => derivedData.allTrucksById[truckId]?.activeJob || null,
+    getRecentIssuesForTruck: (truckId) => derivedData.allTrucksById[truckId]?.recentIssues || [],
+    getRecentJobsForTruck: (truckId) => derivedData.allTrucksById[truckId]?.recentJobs || [],
+    getTruckActivity: (truckId) => derivedData.allTrucksById[truckId]?.activity || [],
   };
 
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>;

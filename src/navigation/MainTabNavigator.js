@@ -1,5 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
+import { useAppData } from '../context/AppContext';
 import colors from '../theme/colors';
 import FleetScreen from '../screens/FleetScreen';
 import IssuesScreen from '../screens/IssuesScreen';
@@ -14,8 +15,11 @@ const TAB_ICONS = {
 };
 
 export default function MainTabNavigator() {
+  const { isManager } = useAppData();
+
   return (
     <Tab.Navigator
+      initialRouteName={isManager ? 'Fleet' : 'Issues'}
       screenOptions={({ route }) => ({
         headerShown: false,
         tabBarActiveTintColor: colors.text,
@@ -37,8 +41,8 @@ export default function MainTabNavigator() {
       })}
     >
       <Tab.Screen name="Fleet" component={FleetScreen} />
-      <Tab.Screen name="Issues" component={IssuesScreen} />
-      <Tab.Screen name="Schedule" component={ScheduleScreen} />
+      {!isManager ? <Tab.Screen name="Issues" component={IssuesScreen} /> : null}
+      {!isManager ? <Tab.Screen name="Schedule" component={ScheduleScreen} /> : null}
     </Tab.Navigator>
   );
 }

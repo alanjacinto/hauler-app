@@ -1,7 +1,8 @@
 import { useMemo, useState } from 'react';
-import { FlatList, StyleSheet, Text, View } from 'react-native';
+import { Pressable, FlatList, StyleSheet, Text, View } from 'react-native';
 import EmptyState from '../components/EmptyState';
 import FilterChips from '../components/FilterChips';
+import ReportIssueModal from '../components/ReportIssueModal';
 import ScreenHeader from '../components/ScreenHeader';
 import SearchBar from '../components/SearchBar';
 import SummaryCard from '../components/SummaryCard';
@@ -10,10 +11,31 @@ import { useAppData } from '../context/AppContext';
 import colors from '../theme/colors';
 import { TRUCK_STATUS_OPTIONS } from '../utils/constants';
 
+function HeaderAction({ label, onPress, primary = false }) {
+  return (
+    <Pressable
+      style={[styles.actionButton, primary && styles.actionButtonPrimary]}
+      onPress={onPress}
+    >
+      <Text style={[styles.actionButtonText, primary && styles.actionButtonTextPrimary]}>
+        {label}
+      </Text>
+    </Pressable>
+  );
+}
+
 export default function FleetScreen({ navigation }) {
-  const { fleetSummary, trucks } = useAppData();
+  const {
+    currentUser,
+    fleetSummary,
+    isManager,
+    logout,
+    reportIssue,
+    trucks,
+  } = useAppData();
   const [query, setQuery] = useState('');
   const [selectedStatus, setSelectedStatus] = useState('ALL');
+  const [isReportIssueVisible, setIsReportIssueVisible] = useState(false);
 
   const filteredTrucks = useMemo(() => {
     const normalizedQuery = query.trim().toLowerCase();
@@ -53,8 +75,23 @@ export default function FleetScreen({ navigation }) {
           <View style={styles.headerBlock}>
             <ScreenHeader
               title="Fleet"
-              subtitle="One place to see which trucks need immediate attention, who is working them, and when they are expected back."
+              subtitle={
+                isManager
+                  ? `Logged in as ${currentUser?.name}. You can report issues and monitor repair progress for your fleet.`
+                  : `Logged in as ${currentUser?.name}. You can inspect the fleet while managing workshop execution.`
+              }
             />
+
+            <View style={styles.actionRow}>
+              {isManager ? (
+                <HeaderAction
+                  label="Report issue"
+                  onPress={() => setIsReportIssueVisible(true)}
+                  primary
+                />
+              ) : null}
+              <HeaderAction label="Switch user" onPress={logout} />
+            </View>
 
             <View style={styles.summaryGrid}>
               <View style={styles.summaryRow}>
@@ -114,6 +151,16 @@ export default function FleetScreen({ navigation }) {
           />
         )}
       />
+
+      <ReportIssueModal
+        visible={isReportIssueVisible}
+        trucks={trucks}
+        onClose={() => setIsReportIssueVisible(false)}
+        onSubmit={(payload) => {
+          reportIssue(payload);
+          setIsReportIssueVisible(false);
+        }}
+      />
     </View>
   );
 }
@@ -131,6 +178,30 @@ const styles = StyleSheet.create({
   headerBlock: {
     gap: 16,
     marginBottom: 16,
+  },
+  actionRow: {
+    flexDirection: 'row',
+    gap: 10,
+  },
+  actionButton: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors.surfaceMuted,
+    borderRadius: 14,
+    paddingVertical: 12,
+  },
+  actionButtonPrimary: {
+    backgroundColor: colors.primary,
+  },
+  actionButtonText: {
+    color: colors.text,
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  actionButtonTextPrimary: {
+    color: colors.overlay,
+    fontWeight: '800',
   },
   summaryGrid: {
     gap: 10,

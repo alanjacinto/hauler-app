@@ -1,5 +1,7 @@
-import { ScrollView, StyleSheet, Text, View } from 'react-native';
+import { useState } from 'react';
+import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import DetailRow from '../components/DetailRow';
+import ReportIssueModal from '../components/ReportIssueModal';
 import ScreenHeader from '../components/ScreenHeader';
 import SectionTitle from '../components/SectionTitle';
 import StatusBadge from '../components/StatusBadge';
@@ -24,6 +26,14 @@ function DetailCard({ children, tone = 'default' }) {
     >
       {children}
     </View>
+  );
+}
+
+function ActionButton({ label, onPress }) {
+  return (
+    <Pressable style={styles.actionButton} onPress={onPress}>
+      <Text style={styles.actionButtonText}>{label}</Text>
+    </Pressable>
   );
 }
 
@@ -69,7 +79,11 @@ export default function TruckDetailScreen({ route }) {
     getRecentJobsForTruck,
     getTruckActivity,
     getTruckById,
+    isManager,
+    reportIssue,
+    trucks,
   } = useAppData();
+  const [isReportModalVisible, setIsReportModalVisible] = useState(false);
   const truckId = route.params?.truckId;
   const truck = getTruckById(truckId);
 
@@ -86,6 +100,7 @@ export default function TruckDetailScreen({ route }) {
   const recentIssues = getRecentIssuesForTruck(truck.id);
   const recentJobs = getRecentJobsForTruck(truck.id);
   const activity = getTruckActivity(truck.id).slice(0, 6);
+  const canReportIssue = isManager && !activeIssue && !activeJob;
 
   const overviewTone =
     truck.status === TRUCK_STATUS.BACK_IN_SERVICE && !activeIssue && !activeJob
@@ -105,160 +120,179 @@ export default function TruckDetailScreen({ route }) {
         : 'An issue is active and the truck should be monitored until the workshop closes it.';
 
   return (
-    <ScrollView
-      style={styles.container}
-      contentContainerStyle={styles.content}
-      showsVerticalScrollIndicator={false}
-    >
-      <ScreenHeader
-        title={`Truck ${truck.unitNumber}`}
-        subtitle={`${truck.company?.name} • ${truck.warehouse?.name}`}
-        right={<StatusBadge status={truck.status} />}
+    <>
+      <ScrollView
+        style={styles.container}
+        contentContainerStyle={styles.content}
+        showsVerticalScrollIndicator={false}
+      >
+        <ScreenHeader
+          title={`Truck ${truck.unitNumber}`}
+          subtitle={`${truck.company?.name} • ${truck.warehouse?.name}`}
+          right={<StatusBadge status={truck.status} />}
+        />
+
+        <DetailCard tone={overviewTone}>
+          <View style={styles.commandTop}>
+            <Text style={styles.commandTitle}>{overviewTitle}</Text>
+            <View style={styles.commandBadges}>
+              <StatusBadge status={truck.status} />
+              {activeIssue ? <StatusBadge status={activeIssue.status} /> : null}
+              {activeJob ? <StatusBadge status={activeJob.status} /> : null}
+            </View>
+          </View>
+          <Text style={styles.commandCopy}>{overviewCopy}</Text>
+
+          {canReportIssue ? (
+            <View style={styles.commandActionRow}>
+              <ActionButton label="Report issue" onPress={() => setIsReportModalVisible(true)} />
+            </View>
+          ) : null}
+
+          <View style={styles.commandGrid}>
+            <View style={styles.commandStat}>
+              <Text style={styles.commandStatLabel}>Active issue</Text>
+              <Text style={styles.commandStatValue}>
+                {activeIssue ? getIssueStatusLabel(activeIssue.status) : 'None'}
+              </Text>
+            </View>
+            <View style={styles.commandStat}>
+              <Text style={styles.commandStatLabel}>Active job</Text>
+              <Text style={styles.commandStatValue}>
+                {activeJob ? getJobStatusLabel(activeJob.status) : 'None'}
+              </Text>
+            </View>
+            <View style={styles.commandStat}>
+              <Text style={styles.commandStatLabel}>Assigned mechanic</Text>
+              <Text style={styles.commandStatValue}>
+                {activeJob?.mechanic?.name || 'Not assigned'}
+              </Text>
+            </View>
+            <View style={styles.commandStat}>
+              <Text style={styles.commandStatLabel}>Return ETA</Text>
+              <Text style={styles.commandStatValue}>
+                {activeJob ? formatDateLabel(activeJob.estimatedReturnDate) : 'Not scheduled'}
+              </Text>
+            </View>
+          </View>
+        </DetailCard>
+
+        <DetailCard>
+          <SectionTitle title="Truck profile" />
+          <View style={styles.stack}>
+            <DetailRow label="Unit number" value={truck.unitNumber} />
+            <DetailRow label="VIN" value={truck.vin} />
+            <DetailRow label="Company" value={truck.company?.name} />
+            <DetailRow label="Warehouse" value={truck.warehouse?.name} />
+            <DetailRow label="Warehouse address" value={truck.warehouse?.address} />
+          </View>
+        </DetailCard>
+
+        <DetailCard>
+          <SectionTitle title="Current issue" />
+          {activeIssue ? (
+            <View style={styles.stack}>
+              <View style={styles.badgeRow}>
+                <StatusBadge status={activeIssue.priority} />
+                <StatusBadge status={activeIssue.status} />
+              </View>
+              <DetailRow label="Reported by" value={activeIssue.reporter?.name} />
+              <DetailRow label="Reported at" value={formatDateTime(activeIssue.createdAt)} />
+              <DetailRow label="Description" value={activeIssue.description} />
+            </View>
+          ) : (
+            <Text style={styles.emptyCardText}>No active issue recorded for this truck.</Text>
+          )}
+        </DetailCard>
+
+        <DetailCard>
+          <SectionTitle title="Current job" />
+          {activeJob ? (
+            <View style={styles.stack}>
+              <View style={styles.badgeRow}>
+                <StatusBadge status={activeJob.status} />
+              </View>
+              <DetailRow label="Mechanic" value={activeJob.mechanic?.name} />
+              <DetailRow label="Warehouse visit" value={activeJob.warehouse?.name} />
+              <DetailRow label="Scheduled date" value={formatDateLabel(activeJob.scheduledDate)} />
+              <DetailRow
+                label="Estimated return"
+                value={formatDateLabel(activeJob.estimatedReturnDate)}
+              />
+            </View>
+          ) : (
+            <Text style={styles.emptyCardText}>No active repair job is open for this truck.</Text>
+          )}
+        </DetailCard>
+
+        <DetailCard>
+          <SectionTitle title="Recent activity" />
+          {activity.length ? (
+            <View style={styles.timelineList}>
+              {activity.map((item) => (
+                <TimelineItem key={item.id} item={item} />
+              ))}
+            </View>
+          ) : (
+            <Text style={styles.emptyCardText}>No activity logged for this truck yet.</Text>
+          )}
+        </DetailCard>
+
+        <DetailCard>
+          <SectionTitle title="Recent issues" />
+          {recentIssues.length ? (
+            <View style={styles.historyList}>
+              {recentIssues.map((issue) => (
+                <HistoryItem
+                  key={issue.id}
+                  title={formatDateTime(issue.createdAt)}
+                  meta={getIssueStatusLabel(issue.status)}
+                  description={issue.description}
+                  badges={
+                    <>
+                      <StatusBadge status={issue.priority} />
+                      <StatusBadge status={issue.status} />
+                    </>
+                  }
+                />
+              ))}
+            </View>
+          ) : (
+            <Text style={styles.emptyCardText}>No issue history recorded for this truck.</Text>
+          )}
+        </DetailCard>
+
+        <DetailCard>
+          <SectionTitle title="Recent jobs" />
+          {recentJobs.length ? (
+            <View style={styles.historyList}>
+              {recentJobs.map((job) => (
+                <HistoryItem
+                  key={job.id}
+                  title={formatDateLabel(job.scheduledDate)}
+                  meta={job.mechanic?.name || 'Unassigned'}
+                  description={`Estimated return ${formatDateLabel(job.estimatedReturnDate)}`}
+                  badges={<StatusBadge status={job.status} />}
+                />
+              ))}
+            </View>
+          ) : (
+            <Text style={styles.emptyCardText}>No repair history recorded for this truck.</Text>
+          )}
+        </DetailCard>
+      </ScrollView>
+
+      <ReportIssueModal
+        visible={isReportModalVisible}
+        trucks={trucks}
+        initialTruck={truck}
+        onClose={() => setIsReportModalVisible(false)}
+        onSubmit={(payload) => {
+          reportIssue(payload);
+          setIsReportModalVisible(false);
+        }}
       />
-
-      <DetailCard tone={overviewTone}>
-        <View style={styles.commandTop}>
-          <Text style={styles.commandTitle}>{overviewTitle}</Text>
-          <View style={styles.commandBadges}>
-            <StatusBadge status={truck.status} />
-            {activeIssue ? <StatusBadge status={activeIssue.status} /> : null}
-            {activeJob ? <StatusBadge status={activeJob.status} /> : null}
-          </View>
-        </View>
-        <Text style={styles.commandCopy}>{overviewCopy}</Text>
-
-        <View style={styles.commandGrid}>
-          <View style={styles.commandStat}>
-            <Text style={styles.commandStatLabel}>Active issue</Text>
-            <Text style={styles.commandStatValue}>
-              {activeIssue ? getIssueStatusLabel(activeIssue.status) : 'None'}
-            </Text>
-          </View>
-          <View style={styles.commandStat}>
-            <Text style={styles.commandStatLabel}>Active job</Text>
-            <Text style={styles.commandStatValue}>
-              {activeJob ? getJobStatusLabel(activeJob.status) : 'None'}
-            </Text>
-          </View>
-          <View style={styles.commandStat}>
-            <Text style={styles.commandStatLabel}>Assigned mechanic</Text>
-            <Text style={styles.commandStatValue}>
-              {activeJob?.mechanic?.name || 'Not assigned'}
-            </Text>
-          </View>
-          <View style={styles.commandStat}>
-            <Text style={styles.commandStatLabel}>Return ETA</Text>
-            <Text style={styles.commandStatValue}>
-              {activeJob ? formatDateLabel(activeJob.estimatedReturnDate) : 'Not scheduled'}
-            </Text>
-          </View>
-        </View>
-      </DetailCard>
-
-      <DetailCard>
-        <SectionTitle title="Truck profile" />
-        <View style={styles.stack}>
-          <DetailRow label="Unit number" value={truck.unitNumber} />
-          <DetailRow label="VIN" value={truck.vin} />
-          <DetailRow label="Company" value={truck.company?.name} />
-          <DetailRow label="Warehouse" value={truck.warehouse?.name} />
-          <DetailRow label="Warehouse address" value={truck.warehouse?.address} />
-        </View>
-      </DetailCard>
-
-      <DetailCard>
-        <SectionTitle title="Current issue" />
-        {activeIssue ? (
-          <View style={styles.stack}>
-            <View style={styles.badgeRow}>
-              <StatusBadge status={activeIssue.priority} />
-              <StatusBadge status={activeIssue.status} />
-            </View>
-            <DetailRow label="Reported by" value={activeIssue.reporter?.name} />
-            <DetailRow label="Reported at" value={formatDateTime(activeIssue.createdAt)} />
-            <DetailRow label="Description" value={activeIssue.description} />
-          </View>
-        ) : (
-          <Text style={styles.emptyCardText}>No active issue recorded for this truck.</Text>
-        )}
-      </DetailCard>
-
-      <DetailCard>
-        <SectionTitle title="Current job" />
-        {activeJob ? (
-          <View style={styles.stack}>
-            <View style={styles.badgeRow}>
-              <StatusBadge status={activeJob.status} />
-            </View>
-            <DetailRow label="Mechanic" value={activeJob.mechanic?.name} />
-            <DetailRow label="Warehouse visit" value={activeJob.warehouse?.name} />
-            <DetailRow label="Scheduled date" value={formatDateLabel(activeJob.scheduledDate)} />
-            <DetailRow
-              label="Estimated return"
-              value={formatDateLabel(activeJob.estimatedReturnDate)}
-            />
-          </View>
-        ) : (
-          <Text style={styles.emptyCardText}>No active repair job is open for this truck.</Text>
-        )}
-      </DetailCard>
-
-      <DetailCard>
-        <SectionTitle title="Recent activity" />
-        {activity.length ? (
-          <View style={styles.timelineList}>
-            {activity.map((item) => (
-              <TimelineItem key={item.id} item={item} />
-            ))}
-          </View>
-        ) : (
-          <Text style={styles.emptyCardText}>No activity logged for this truck yet.</Text>
-        )}
-      </DetailCard>
-
-      <DetailCard>
-        <SectionTitle title="Recent issues" />
-        {recentIssues.length ? (
-          <View style={styles.historyList}>
-            {recentIssues.map((issue) => (
-              <HistoryItem
-                key={issue.id}
-                title={formatDateTime(issue.createdAt)}
-                meta={getIssueStatusLabel(issue.status)}
-                description={issue.description}
-                badges={
-                  <>
-                    <StatusBadge status={issue.priority} />
-                    <StatusBadge status={issue.status} />
-                  </>
-                }
-              />
-            ))}
-          </View>
-        ) : (
-          <Text style={styles.emptyCardText}>No issue history recorded for this truck.</Text>
-        )}
-      </DetailCard>
-
-      <DetailCard>
-        <SectionTitle title="Recent jobs" />
-        {recentJobs.length ? (
-          <View style={styles.historyList}>
-            {recentJobs.map((job) => (
-              <HistoryItem
-                key={job.id}
-                title={formatDateLabel(job.scheduledDate)}
-                meta={job.mechanic?.name || 'Unassigned'}
-                description={`Estimated return ${formatDateLabel(job.estimatedReturnDate)}`}
-                badges={<StatusBadge status={job.status} />}
-              />
-            ))}
-          </View>
-        ) : (
-          <Text style={styles.emptyCardText}>No repair history recorded for this truck.</Text>
-        )}
-      </DetailCard>
-    </ScrollView>
+    </>
   );
 }
 
@@ -316,6 +350,21 @@ const styles = StyleSheet.create({
     fontSize: 14,
     lineHeight: 21,
     marginBottom: 14,
+  },
+  commandActionRow: {
+    marginBottom: 14,
+  },
+  actionButton: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors.primary,
+    borderRadius: 14,
+    paddingVertical: 13,
+  },
+  actionButtonText: {
+    color: colors.overlay,
+    fontSize: 14,
+    fontWeight: '800',
   },
   commandGrid: {
     flexDirection: 'row',

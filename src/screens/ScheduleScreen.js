@@ -59,7 +59,13 @@ function groupJobsByDateAndWarehouse(jobs) {
 }
 
 export default function ScheduleScreen({ navigation }) {
-  const { completeJobWorkflow, jobs, updateJobStatus } = useAppData();
+  const {
+    completeJobWorkflow,
+    currentUser,
+    isWorkshopUser,
+    jobs,
+    updateJobStatus,
+  } = useAppData();
   const [statusFilter, setStatusFilter] = useState('ALL');
   const [warehouseFilter, setWarehouseFilter] = useState('ALL');
   const [mechanicFilter, setMechanicFilter] = useState('ALL');
@@ -119,7 +125,7 @@ export default function ScheduleScreen({ navigation }) {
           <View style={styles.headerBlock}>
             <ScreenHeader
               title="Schedule"
-              subtitle="Daily workshop planning organized by visit date so managers and mechanics know what gets worked on next."
+              subtitle={`Logged in as ${currentUser?.name}. Manage today’s queue, track repairs in progress, and close completed work.`}
             />
 
             <View style={styles.summaryRow}>
@@ -177,6 +183,7 @@ export default function ScheduleScreen({ navigation }) {
                         onPress={() =>
                           navigation.navigate('TruckDetail', { truckId: job.truck?.id })
                         }
+                        showWorkflowAction={isWorkshopUser}
                         onPressWorkflow={() => {
                           if (job.status === JOB_STATUS.SCHEDULED) {
                             updateJobStatus(job.id, JOB_STATUS.IN_PROGRESS);
