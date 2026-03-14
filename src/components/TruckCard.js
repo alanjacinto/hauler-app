@@ -1,39 +1,83 @@
 import { Ionicons } from '@expo/vector-icons';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import colors from '../theme/colors';
+import { formatDateLabel, getJobStatusLabel, getIssueStatusLabel } from '../utils/formatters';
 import StatusBadge from './StatusBadge';
 
-export default function TruckCard({ truck, onPress }) {
+function MetaStat({ label, value }) {
   return (
-    <Pressable style={styles.card} onPress={onPress}>
+    <View style={styles.metaStat}>
+      <Text style={styles.metaStatLabel}>{label}</Text>
+      <Text style={styles.metaStatValue} numberOfLines={1}>
+        {value}
+      </Text>
+    </View>
+  );
+}
+
+export default function TruckCard({ truck, onPress }) {
+  const activeIssue = truck.activeIssue;
+  const activeJob = truck.activeJob;
+  const needsAttention = Boolean(activeIssue || activeJob);
+
+  return (
+    <Pressable style={[styles.card, needsAttention && styles.cardAttention]} onPress={onPress}>
       <View style={styles.topRow}>
         <View style={styles.identity}>
           <Text style={styles.unit}>Truck {truck.unitNumber}</Text>
-          <Text style={styles.subtext}>{truck.company?.name}</Text>
+          <Text style={styles.subtext}>
+            {truck.company?.name} • {truck.warehouse?.name}
+          </Text>
         </View>
         <Ionicons name="chevron-forward" size={18} color={colors.textSoft} />
       </View>
 
-      <View style={styles.metaRow}>
-        <Text style={styles.metaLabel}>VIN</Text>
-        <Text style={styles.metaValue}>{truck.vin}</Text>
+      <View style={styles.statusRow}>
+        <StatusBadge status={truck.status} />
+        {activeIssue ? <StatusBadge status={activeIssue.status} /> : null}
+        {activeJob ? <StatusBadge status={activeJob.status} /> : null}
       </View>
 
-      <View style={styles.metaRow}>
-        <Text style={styles.metaLabel}>Warehouse</Text>
-        <Text style={styles.metaValue}>{truck.warehouse?.name}</Text>
+      <View style={styles.metaGrid}>
+        <MetaStat label="VIN" value={truck.vin} />
+        <MetaStat
+          label="Mechanic"
+          value={activeJob?.mechanic?.name || 'Not assigned'}
+        />
       </View>
 
-      {truck.latestIssue ? (
-        <View style={styles.alertBox}>
-          <Text style={styles.alertLabel}>Current issue</Text>
-          <Text style={styles.alertText} numberOfLines={2}>
-            {truck.latestIssue.description}
+      {activeIssue ? (
+        <View style={styles.signalBox}>
+          <View style={styles.signalHeader}>
+            <Text style={styles.signalTitle}>Active issue</Text>
+            <Text style={styles.signalMeta}>{getIssueStatusLabel(activeIssue.status)}</Text>
+          </View>
+          <Text style={styles.signalText} numberOfLines={2}>
+            {activeIssue.description}
           </Text>
         </View>
-      ) : null}
+      ) : (
+        <View style={[styles.signalBox, styles.healthyBox]}>
+          <Text style={styles.healthyTitle}>Healthy status</Text>
+          <Text style={styles.healthyText}>No active issue blocking service right now.</Text>
+        </View>
+      )}
 
-      <StatusBadge status={truck.status} />
+      {activeJob ? (
+        <View style={styles.jobPanel}>
+          <View style={styles.jobPanelHeader}>
+            <Text style={styles.jobPanelTitle}>Current job</Text>
+            <Text style={styles.jobPanelMeta}>{getJobStatusLabel(activeJob.status)}</Text>
+          </View>
+          <View style={styles.jobPanelGrid}>
+            <MetaStat label="Warehouse" value={activeJob.warehouse?.name || 'Unassigned'} />
+            <MetaStat
+              label="Return ETA"
+              value={formatDateLabel(activeJob.estimatedReturnDate)}
+            />
+          </View>
+        </View>
+      ) : null}
     </Pressable>
   );
 }
@@ -46,7 +90,10 @@ const styles = StyleSheet.create({
     marginBottom: 12,
     borderWidth: 1,
     borderColor: colors.border,
-    gap: 12,
+    gap: 14,
+  },
+  cardAttention: {
+    borderColor: colors.warning,
   },
   topRow: {
     flexDirection: 'row',
@@ -67,41 +114,102 @@ const styles = StyleSheet.create({
     color: colors.textMuted,
     fontSize: 14,
   },
-  metaRow: {
+  statusRow: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    gap: 12,
+    flexWrap: 'wrap',
+    gap: 8,
   },
-  metaLabel: {
-    color: colors.textSoft,
-    fontSize: 12,
-    fontWeight: '700',
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
+  metaGrid: {
+    flexDirection: 'row',
+    gap: 10,
   },
-  metaValue: {
+  metaStat: {
     flex: 1,
-    color: colors.text,
-    fontSize: 14,
-    textAlign: 'right',
-  },
-  alertBox: {
     backgroundColor: colors.surfaceMuted,
     borderRadius: 14,
     padding: 12,
     gap: 4,
   },
-  alertLabel: {
+  metaStatLabel: {
+    color: colors.textSoft,
+    fontSize: 11,
+    fontWeight: '700',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  metaStatValue: {
+    color: colors.text,
+    fontSize: 13,
+    fontWeight: '600',
+  },
+  signalBox: {
+    backgroundColor: colors.surfaceMuted,
+    borderRadius: 14,
+    padding: 12,
+    gap: 6,
+  },
+  signalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    gap: 12,
+  },
+  signalTitle: {
     color: colors.warning,
     fontSize: 12,
     fontWeight: '800',
     textTransform: 'uppercase',
     letterSpacing: 0.5,
   },
-  alertText: {
+  signalMeta: {
     color: colors.textMuted,
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  signalText: {
+    color: colors.text,
     fontSize: 13,
     lineHeight: 19,
+  },
+  healthyBox: {
+    backgroundColor: colors.successMuted,
+  },
+  healthyTitle: {
+    color: colors.success,
+    fontSize: 12,
+    fontWeight: '800',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  healthyText: {
+    color: colors.text,
+    fontSize: 13,
+    lineHeight: 19,
+  },
+  jobPanel: {
+    backgroundColor: colors.chip,
+    borderRadius: 14,
+    padding: 12,
+    gap: 10,
+  },
+  jobPanelHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    gap: 12,
+  },
+  jobPanelTitle: {
+    color: colors.info,
+    fontSize: 12,
+    fontWeight: '800',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  jobPanelMeta: {
+    color: colors.textMuted,
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  jobPanelGrid: {
+    flexDirection: 'row',
+    gap: 10,
   },
 });

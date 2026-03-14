@@ -1,9 +1,9 @@
 import {
-  ISSUE_STATUS,
-  JOB_STATUS,
-  PRIORITY,
-  ROLES,
-  TRUCK_STATUS,
+    ISSUE_STATUS,
+    JOB_STATUS,
+    PRIORITY,
+    ROLES,
+    TRUCK_STATUS,
 } from '../utils/constants';
 
 export const companies = [

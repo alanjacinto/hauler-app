@@ -1,5 +1,7 @@
+import { useMemo, useState } from 'react';
 import { FlatList, StyleSheet, Text, View } from 'react-native';
 import EmptyState from '../components/EmptyState';
+import FilterChips from '../components/FilterChips';
 import ScheduleCard from '../components/ScheduleCard';
 import ScreenHeader from '../components/ScreenHeader';
 import SectionTitle from '../components/SectionTitle';
@@ -9,20 +11,47 @@ import { JOB_STATUS } from '../utils/constants';
 import colors from '../theme/colors';
 import { formatDateLabel, getLocalDateValue } from '../utils/formatters';
 
-function groupJobsByWarehouse(jobs) {
-  return jobs.reduce((accumulator, job) => {
-    const warehouseName = job.warehouse?.name || 'Unassigned warehouse';
-    const existingGroup = accumulator.find((group) => group.key === warehouseName);
+const STATUS_FILTERS = [
+  { label: 'All', value: 'ALL' },
+  { label: 'Scheduled', value: JOB_STATUS.SCHEDULED },
+  { label: 'In Progress', value: JOB_STATUS.IN_PROGRESS },
+  { label: 'Done', value: JOB_STATUS.DONE },
+];
 
-    if (existingGroup) {
-      existingGroup.jobs.push(job);
+function groupJobsByDateAndWarehouse(jobs) {
+  return jobs.reduce((accumulator, job) => {
+    const existingDay = accumulator.find((item) => item.date === job.scheduledDate);
+    const warehouseName = job.warehouse?.name || 'Unassigned warehouse';
+
+    if (existingDay) {
+      const existingWarehouse = existingDay.warehouses.find(
+        (warehouse) => warehouse.key === warehouseName
+      );
+
+      if (existingWarehouse) {
+        existingWarehouse.jobs.push(job);
+      } else {
+        existingDay.warehouses.push({
+          key: warehouseName,
+          label: warehouseName,
+          jobs: [job],
+        });
+      }
+
+      existingDay.jobs.push(job);
       return accumulator;
     }
 
     accumulator.push({
-      key: warehouseName,
-      label: warehouseName,
+      date: job.scheduledDate,
       jobs: [job],
+      warehouses: [
+        {
+          key: warehouseName,
+          label: warehouseName,
+          jobs: [job],
+        },
+      ],
     });
 
     return accumulator;
@@ -30,8 +59,50 @@ function groupJobsByWarehouse(jobs) {
 }
 
 export default function ScheduleScreen({ navigation }) {
-  const { completeJobWorkflow, jobs, scheduleDays, updateJobStatus } = useAppData();
+  const { completeJobWorkflow, jobs, updateJobStatus } = useAppData();
+  const [statusFilter, setStatusFilter] = useState('ALL');
+  const [warehouseFilter, setWarehouseFilter] = useState('ALL');
+  const [mechanicFilter, setMechanicFilter] = useState('ALL');
   const todayValue = getLocalDateValue();
+
+  const warehouseOptions = useMemo(() => {
+    const uniqueWarehouses = [...new Set(jobs.map((job) => job.warehouse?.name).filter(Boolean))];
+
+    return [{ label: 'All warehouses', value: 'ALL' }].concat(
+      uniqueWarehouses.map((warehouse) => ({
+        label: warehouse,
+        value: warehouse,
+      }))
+    );
+  }, [jobs]);
+
+  const mechanicOptions = useMemo(() => {
+    const uniqueMechanics = [...new Set(jobs.map((job) => job.mechanic?.name).filter(Boolean))];
+
+    return [{ label: 'All mechanics', value: 'ALL' }].concat(
+      uniqueMechanics.map((mechanic) => ({
+        label: mechanic,
+        value: mechanic,
+      }))
+    );
+  }, [jobs]);
+
+  const filteredJobs = useMemo(() => {
+    return jobs.filter((job) => {
+      const matchesStatus = statusFilter === 'ALL' || job.status === statusFilter;
+      const matchesWarehouse =
+        warehouseFilter === 'ALL' || job.warehouse?.name === warehouseFilter;
+      const matchesMechanic =
+        mechanicFilter === 'ALL' || job.mechanic?.name === mechanicFilter;
+
+      return matchesStatus && matchesWarehouse && matchesMechanic;
+    });
+  }, [jobs, mechanicFilter, statusFilter, warehouseFilter]);
+
+  const scheduleDays = useMemo(
+    () => groupJobsByDateAndWarehouse(filteredJobs),
+    [filteredJobs]
+  );
 
   const todaysJobs = jobs.filter((job) => job.scheduledDate === todayValue).length;
   const activeJobs = jobs.filter((job) => job.status === JOB_STATUS.IN_PROGRESS).length;
@@ -56,58 +127,74 @@ export default function ScheduleScreen({ navigation }) {
               <SummaryCard label="In progress" value={activeJobs} tone="warning" />
               <SummaryCard label="Upcoming" value={scheduledJobs} tone="success" />
             </View>
+
+            <View style={styles.filterPanel}>
+              <FilterChips
+                options={STATUS_FILTERS}
+                selectedValue={statusFilter}
+                onSelect={setStatusFilter}
+              />
+              <FilterChips
+                options={warehouseOptions}
+                selectedValue={warehouseFilter}
+                onSelect={setWarehouseFilter}
+              />
+              <FilterChips
+                options={mechanicOptions}
+                selectedValue={mechanicFilter}
+                onSelect={setMechanicFilter}
+              />
+            </View>
           </View>
         }
         ListEmptyComponent={
           <EmptyState
             icon="calendar-outline"
-            title="No jobs scheduled"
-            description="Once the workshop starts assigning work, the repair schedule will appear here."
+            title="No jobs match this view"
+            description="Try clearing one of the filters to bring scheduled work back into view."
           />
         }
-        renderItem={({ item }) => {
-          const warehouseGroups = groupJobsByWarehouse(item.jobs);
-
-          return (
-            <View style={styles.daySection}>
-              <SectionTitle title={formatDateLabel(item.date)} />
-              <View style={styles.dayMeta}>
-                <Text style={styles.dayMetaText}>{item.jobs.length} jobs planned</Text>
-              </View>
-
-              <View style={styles.warehouseGroups}>
-                {warehouseGroups.map((group) => (
-                  <View key={`${item.date}-${group.key}`} style={styles.warehouseSection}>
-                    <View style={styles.warehouseHeader}>
-                      <Text style={styles.warehouseTitle}>{group.label}</Text>
-                      <Text style={styles.warehouseMeta}>{group.jobs.length} jobs</Text>
-                    </View>
-
-                    <View style={styles.dayCards}>
-                      {group.jobs.map((job) => (
-                        <ScheduleCard
-                          key={job.id}
-                          job={job}
-                          onPress={() => navigation.navigate('TruckDetail', { truckId: job.truck?.id })}
-                          onPressWorkflow={() => {
-                            if (job.status === JOB_STATUS.SCHEDULED) {
-                              updateJobStatus(job.id, JOB_STATUS.IN_PROGRESS);
-                              return;
-                            }
-
-                            if (job.status === JOB_STATUS.IN_PROGRESS) {
-                              completeJobWorkflow(job.id);
-                            }
-                          }}
-                        />
-                      ))}
-                    </View>
-                  </View>
-                ))}
-              </View>
+        renderItem={({ item }) => (
+          <View style={styles.daySection}>
+            <SectionTitle title={formatDateLabel(item.date)} />
+            <View style={styles.dayMeta}>
+              <Text style={styles.dayMetaText}>{item.jobs.length} jobs planned</Text>
             </View>
-          );
-        }}
+
+            <View style={styles.warehouseGroups}>
+              {item.warehouses.map((group) => (
+                <View key={`${item.date}-${group.key}`} style={styles.warehouseSection}>
+                  <View style={styles.warehouseHeader}>
+                    <Text style={styles.warehouseTitle}>{group.label}</Text>
+                    <Text style={styles.warehouseMeta}>{group.jobs.length} jobs</Text>
+                  </View>
+
+                  <View style={styles.dayCards}>
+                    {group.jobs.map((job) => (
+                      <ScheduleCard
+                        key={job.id}
+                        job={job}
+                        onPress={() =>
+                          navigation.navigate('TruckDetail', { truckId: job.truck?.id })
+                        }
+                        onPressWorkflow={() => {
+                          if (job.status === JOB_STATUS.SCHEDULED) {
+                            updateJobStatus(job.id, JOB_STATUS.IN_PROGRESS);
+                            return;
+                          }
+
+                          if (job.status === JOB_STATUS.IN_PROGRESS) {
+                            completeJobWorkflow(job.id);
+                          }
+                        }}
+                      />
+                    ))}
+                  </View>
+                </View>
+              ))}
+            </View>
+          </View>
+        )}
       />
     </View>
   );
@@ -130,6 +217,9 @@ const styles = StyleSheet.create({
   summaryRow: {
     flexDirection: 'row',
     gap: 10,
+  },
+  filterPanel: {
+    gap: 12,
   },
   daySection: {
     marginBottom: 22,

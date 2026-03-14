@@ -7,12 +7,7 @@ import {
   users,
   warehouses,
 } from '../data/mockData';
-import {
-  ISSUE_STATUS,
-  JOB_STATUS,
-  ROLES,
-  TRUCK_STATUS,
-} from '../utils/constants';
+import { ISSUE_STATUS, JOB_STATUS, ROLES, TRUCK_STATUS } from '../utils/constants';
 
 const AppContext = createContext(null);
 
@@ -91,6 +86,70 @@ function createJobId() {
   return `job-${Date.now()}`;
 }
 
+function getTruckActivity(truck, issuesForTruck, jobsForTruck) {
+  const issueEvents = issuesForTruck.flatMap((issue) => {
+    const events = [
+      {
+        id: `${issue.id}-reported`,
+        type: 'ISSUE_REPORTED',
+        title: 'Issue reported',
+        description: issue.description,
+        occurredAt: issue.createdAt,
+      },
+    ];
+
+    if (issue.status === ISSUE_STATUS.RESOLVED) {
+      const relatedJob = jobsForTruck.find((job) => job.issueId === issue.id);
+
+      events.push({
+        id: `${issue.id}-resolved`,
+        type: 'ISSUE_RESOLVED',
+        title: 'Issue resolved',
+        description: `Truck ${truck.unitNumber} returned to service.`,
+        occurredAt: relatedJob?.estimatedReturnDate || issue.createdAt,
+      });
+    }
+
+    return events;
+  });
+
+  const jobEvents = jobsForTruck.flatMap((job) => {
+    const events = [
+      {
+        id: `${job.id}-scheduled`,
+        type: 'JOB_SCHEDULED',
+        title: 'Repair scheduled',
+        description: `${job.mechanic?.name || 'Workshop mechanic'} assigned at ${job.warehouse?.name || 'workshop'}.`,
+        occurredAt: job.scheduledDate,
+      },
+    ];
+
+    if (job.status === JOB_STATUS.IN_PROGRESS || job.status === JOB_STATUS.DONE) {
+      events.push({
+        id: `${job.id}-started`,
+        type: 'JOB_STARTED',
+        title: 'Repair in progress',
+        description: `${job.mechanic?.name || 'Mechanic'} is working on the truck.`,
+        occurredAt: job.scheduledDate,
+      });
+    }
+
+    if (job.status === JOB_STATUS.DONE) {
+      events.push({
+        id: `${job.id}-completed`,
+        type: 'JOB_DONE',
+        title: 'Repair completed',
+        description: `Estimated return completed for ${job.warehouse?.name || 'assigned warehouse'}.`,
+        occurredAt: job.estimatedReturnDate || job.scheduledDate,
+      });
+    }
+
+    return events;
+  });
+
+  return sortByDateDescending([...issueEvents, ...jobEvents], 'occurredAt');
+}
+
 export function AppProvider({ children }) {
   const [trucksState, setTrucksState] = useState(initialTrucks);
   const [issuesState, setIssuesState] = useState(initialIssues);
@@ -135,6 +194,11 @@ export function AppProvider({ children }) {
       const warehouse = warehousesById[truck.warehouseId] || null;
       const truckIssues = sortByDateDescending(issuesByTruckId[truck.id] || [], 'createdAt');
       const truckJobs = sortByDateDescending(jobsByTruckId[truck.id] || [], 'scheduledDate');
+      const currentIssue = getCurrentIssue(truckIssues);
+      const currentJob = getCurrentJob(truckJobs);
+      const activeIssue =
+        truckIssues.find((issue) => issue.status !== ISSUE_STATUS.RESOLVED) || null;
+      const activeJob = truckJobs.find((job) => job.status !== JOB_STATUS.DONE) || null;
 
       return {
         ...truck,
@@ -142,8 +206,10 @@ export function AppProvider({ children }) {
         warehouse,
         issues: truckIssues,
         jobs: truckJobs,
-        currentIssue: getCurrentIssue(truckIssues),
-        currentJob: getCurrentJob(truckJobs),
+        currentIssue,
+        currentJob,
+        activeIssue,
+        activeJob,
         latestIssue: truckIssues[0] || null,
         latestJob: truckJobs[0] || null,
       };
@@ -194,19 +260,36 @@ export function AppProvider({ children }) {
 
     const jobsById = mapById(jobsWithIssueDetails);
 
-    const trucksWithResolvedRelations = trucksDetailed.map((truck) => ({
-      ...truck,
-      issues: (truck.issues || []).map((issue) => issuesDetailedById[issue.id] || issue),
-      jobs: (truck.jobs || []).map((job) => jobsById[job.id] || job),
-      currentIssue: truck.currentIssue
+    const trucksWithResolvedRelations = trucksDetailed.map((truck) => {
+      const issues = (truck.issues || []).map((issue) => issuesDetailedById[issue.id] || issue);
+      const jobs = (truck.jobs || []).map((job) => jobsById[job.id] || job);
+      const currentIssue = truck.currentIssue
         ? issuesDetailedById[truck.currentIssue.id] || truck.currentIssue
-        : null,
-      currentJob: truck.currentJob ? jobsById[truck.currentJob.id] || truck.currentJob : null,
-      latestIssue: truck.latestIssue
-        ? issuesDetailedById[truck.latestIssue.id] || truck.latestIssue
-        : null,
-      latestJob: truck.latestJob ? jobsById[truck.latestJob.id] || truck.latestJob : null,
-    }));
+        : null;
+      const currentJob = truck.currentJob ? jobsById[truck.currentJob.id] || truck.currentJob : null;
+      const activeIssue = truck.activeIssue
+        ? issuesDetailedById[truck.activeIssue.id] || truck.activeIssue
+        : null;
+      const activeJob = truck.activeJob ? jobsById[truck.activeJob.id] || truck.activeJob : null;
+      const activity = getTruckActivity(truck, issues, jobs);
+
+      return {
+        ...truck,
+        issues,
+        jobs,
+        currentIssue,
+        currentJob,
+        activeIssue,
+        activeJob,
+        latestIssue: truck.latestIssue
+          ? issuesDetailedById[truck.latestIssue.id] || truck.latestIssue
+          : null,
+        latestJob: truck.latestJob ? jobsById[truck.latestJob.id] || truck.latestJob : null,
+        recentIssues: issues.slice(0, 3),
+        recentJobs: sortByDateDescending(jobs, 'scheduledDate').slice(0, 3),
+        activity,
+      };
+    });
 
     const trucksResolvedById = mapById(trucksWithResolvedRelations);
 
@@ -226,11 +309,28 @@ export function AppProvider({ children }) {
       return accumulator;
     }, []);
 
+    const fleetSummary = {
+      total: trucksWithResolvedRelations.length,
+      outOfService: trucksWithResolvedRelations.filter(
+        (truck) => truck.status === TRUCK_STATUS.OUT_OF_SERVICE
+      ).length,
+      inRepair: trucksWithResolvedRelations.filter(
+        (truck) => truck.status === TRUCK_STATUS.IN_REPAIR
+      ).length,
+      backInService: trucksWithResolvedRelations.filter(
+        (truck) => truck.status === TRUCK_STATUS.BACK_IN_SERVICE
+      ).length,
+      attentionNow: trucksWithResolvedRelations.filter(
+        (truck) => truck.activeIssue || truck.activeJob
+      ).length,
+    };
+
     return {
       trucks: trucksWithResolvedRelations,
       issues: issuesDetailed,
       jobs: jobsWithIssueDetails,
       scheduleDays,
+      fleetSummary,
       trucksResolvedById,
       issuesDetailedById,
       jobsById,
@@ -376,6 +476,7 @@ export function AppProvider({ children }) {
     issues: derivedData.issues,
     jobs: derivedData.jobs,
     scheduleDays: derivedData.scheduleDays,
+    fleetSummary: derivedData.fleetSummary,
     assignIssueToJob,
     updateJobStatus,
     resolveIssue,
@@ -390,6 +491,12 @@ export function AppProvider({ children }) {
     getCurrentIssueForTruck: (truckId) =>
       derivedData.trucksResolvedById[truckId]?.currentIssue || null,
     getCurrentJobForTruck: (truckId) => derivedData.trucksResolvedById[truckId]?.currentJob || null,
+    getActiveIssueForTruck: (truckId) => derivedData.trucksResolvedById[truckId]?.activeIssue || null,
+    getActiveJobForTruck: (truckId) => derivedData.trucksResolvedById[truckId]?.activeJob || null,
+    getRecentIssuesForTruck: (truckId) =>
+      derivedData.trucksResolvedById[truckId]?.recentIssues || [],
+    getRecentJobsForTruck: (truckId) => derivedData.trucksResolvedById[truckId]?.recentJobs || [],
+    getTruckActivity: (truckId) => derivedData.trucksResolvedById[truckId]?.activity || [],
   };
 
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>;
