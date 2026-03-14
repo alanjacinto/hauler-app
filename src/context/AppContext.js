@@ -202,7 +202,9 @@ export function AppProvider({ children }) {
         ? issuesDetailedById[truck.currentIssue.id] || truck.currentIssue
         : null,
       currentJob: truck.currentJob ? jobsById[truck.currentJob.id] || truck.currentJob : null,
-      latestIssue: truck.latestIssue ? issuesDetailedById[truck.latestIssue.id] || truck.latestIssue : null,
+      latestIssue: truck.latestIssue
+        ? issuesDetailedById[truck.latestIssue.id] || truck.latestIssue
+        : null,
       latestJob: truck.latestJob ? jobsById[truck.latestJob.id] || truck.latestJob : null,
     }));
 
@@ -319,6 +321,10 @@ export function AppProvider({ children }) {
     if (status === JOB_STATUS.IN_PROGRESS) {
       updateTruckStatus(targetJob.truckId, TRUCK_STATUS.IN_REPAIR);
     }
+
+    if (status === JOB_STATUS.DONE) {
+      updateTruckStatus(targetJob.truckId, TRUCK_STATUS.BACK_IN_SERVICE);
+    }
   };
 
   const resolveIssue = (issueId) => {
@@ -351,6 +357,16 @@ export function AppProvider({ children }) {
     updateTruckStatus(targetIssue.truckId, TRUCK_STATUS.BACK_IN_SERVICE);
   };
 
+  const completeJobWorkflow = (jobId) => {
+    const targetJob = jobsState.find((job) => job.id === jobId);
+
+    if (!targetJob) {
+      return;
+    }
+
+    resolveIssue(targetJob.issueId);
+  };
+
   const value = {
     companies,
     warehouses,
@@ -364,6 +380,7 @@ export function AppProvider({ children }) {
     updateJobStatus,
     resolveIssue,
     updateTruckStatus,
+    completeJobWorkflow,
     getTruckById: (truckId) => derivedData.trucksResolvedById[truckId] || null,
     getIssueById: (issueId) => derivedData.issuesDetailedById[issueId] || null,
     getJobById: (jobId) => derivedData.jobsById[jobId] || null,

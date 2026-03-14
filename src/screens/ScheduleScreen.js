@@ -5,14 +5,35 @@ import ScreenHeader from '../components/ScreenHeader';
 import SectionTitle from '../components/SectionTitle';
 import SummaryCard from '../components/SummaryCard';
 import { useAppData } from '../context/AppContext';
-import colors from '../theme/colors';
 import { JOB_STATUS } from '../utils/constants';
-import { formatDateLabel } from '../utils/formatters';
+import colors from '../theme/colors';
+import { formatDateLabel, getLocalDateValue } from '../utils/formatters';
+
+function groupJobsByWarehouse(jobs) {
+  return jobs.reduce((accumulator, job) => {
+    const warehouseName = job.warehouse?.name || 'Unassigned warehouse';
+    const existingGroup = accumulator.find((group) => group.key === warehouseName);
+
+    if (existingGroup) {
+      existingGroup.jobs.push(job);
+      return accumulator;
+    }
+
+    accumulator.push({
+      key: warehouseName,
+      label: warehouseName,
+      jobs: [job],
+    });
+
+    return accumulator;
+  }, []);
+}
 
 export default function ScheduleScreen({ navigation }) {
-  const { jobs, scheduleDays } = useAppData();
+  const { completeJobWorkflow, jobs, scheduleDays, updateJobStatus } = useAppData();
+  const todayValue = getLocalDateValue();
 
-  const todaysJobs = jobs.filter((job) => job.scheduledDate === '2026-03-13').length;
+  const todaysJobs = jobs.filter((job) => job.scheduledDate === todayValue).length;
   const activeJobs = jobs.filter((job) => job.status === JOB_STATUS.IN_PROGRESS).length;
   const scheduledJobs = jobs.filter((job) => job.status === JOB_STATUS.SCHEDULED).length;
 
@@ -44,24 +65,49 @@ export default function ScheduleScreen({ navigation }) {
             description="Once the workshop starts assigning work, the repair schedule will appear here."
           />
         }
-        renderItem={({ item }) => (
-          <View style={styles.daySection}>
-            <SectionTitle title={formatDateLabel(item.date)} />
-            <View style={styles.dayMeta}>
-              <Text style={styles.dayMetaText}>{item.jobs.length} jobs planned</Text>
-            </View>
+        renderItem={({ item }) => {
+          const warehouseGroups = groupJobsByWarehouse(item.jobs);
 
-            <View style={styles.dayCards}>
-              {item.jobs.map((job) => (
-                <ScheduleCard
-                  key={job.id}
-                  job={job}
-                  onPress={() => navigation.navigate('TruckDetail', { truckId: job.truck?.id })}
-                />
-              ))}
+          return (
+            <View style={styles.daySection}>
+              <SectionTitle title={formatDateLabel(item.date)} />
+              <View style={styles.dayMeta}>
+                <Text style={styles.dayMetaText}>{item.jobs.length} jobs planned</Text>
+              </View>
+
+              <View style={styles.warehouseGroups}>
+                {warehouseGroups.map((group) => (
+                  <View key={`${item.date}-${group.key}`} style={styles.warehouseSection}>
+                    <View style={styles.warehouseHeader}>
+                      <Text style={styles.warehouseTitle}>{group.label}</Text>
+                      <Text style={styles.warehouseMeta}>{group.jobs.length} jobs</Text>
+                    </View>
+
+                    <View style={styles.dayCards}>
+                      {group.jobs.map((job) => (
+                        <ScheduleCard
+                          key={job.id}
+                          job={job}
+                          onPress={() => navigation.navigate('TruckDetail', { truckId: job.truck?.id })}
+                          onPressWorkflow={() => {
+                            if (job.status === JOB_STATUS.SCHEDULED) {
+                              updateJobStatus(job.id, JOB_STATUS.IN_PROGRESS);
+                              return;
+                            }
+
+                            if (job.status === JOB_STATUS.IN_PROGRESS) {
+                              completeJobWorkflow(job.id);
+                            }
+                          }}
+                        />
+                      ))}
+                    </View>
+                  </View>
+                ))}
+              </View>
             </View>
-          </View>
-        )}
+          );
+        }}
       />
     </View>
   );
@@ -94,6 +140,31 @@ const styles = StyleSheet.create({
   dayMetaText: {
     color: colors.textMuted,
     fontSize: 13,
+  },
+  warehouseGroups: {
+    gap: 16,
+  },
+  warehouseSection: {
+    gap: 10,
+  },
+  warehouseHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    backgroundColor: colors.surfaceMuted,
+    borderRadius: 14,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+  },
+  warehouseTitle: {
+    color: colors.text,
+    fontSize: 14,
+    fontWeight: '800',
+  },
+  warehouseMeta: {
+    color: colors.textMuted,
+    fontSize: 12,
+    fontWeight: '700',
   },
   dayCards: {
     gap: 12,
