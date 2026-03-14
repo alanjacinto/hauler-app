@@ -4,6 +4,7 @@ import DetailRow from '../components/DetailRow';
 import ReportIssueModal from '../components/ReportIssueModal';
 import ScreenHeader from '../components/ScreenHeader';
 import SectionTitle from '../components/SectionTitle';
+import SessionBar from '../components/SessionBar';
 import StatusBadge from '../components/StatusBadge';
 import { useAppData } from '../context/AppContext';
 import colors from '../theme/colors';
@@ -126,6 +127,8 @@ export default function TruckDetailScreen({ route }) {
         contentContainerStyle={styles.content}
         showsVerticalScrollIndicator={false}
       >
+        <SessionBar />
+
         <ScreenHeader
           title={`Truck ${truck.unitNumber}`}
           subtitle={`${truck.company?.name} • ${truck.warehouse?.name}`}

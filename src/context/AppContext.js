@@ -1,4 +1,4 @@
-import { createContext, useContext, useMemo, useState } from 'react';
+import { createContext, useContext, useEffect, useMemo, useState } from 'react';
 import {
   companies,
   issues as initialIssues,
@@ -182,14 +182,28 @@ export function AppProvider({ children }) {
   const [issuesState, setIssuesState] = useState(initialIssues);
   const [jobsState, setJobsState] = useState(initialJobs);
   const [currentUserId, setCurrentUserId] = useState(null);
+  const [feedback, setFeedback] = useState(null);
 
   const currentUser = users.find((user) => user.id === currentUserId) || null;
+  const currentCompany = companies.find((company) => company.id === currentUser?.companyId) || null;
   const isManager = currentUser?.role === ROLES.MANAGER;
   const isWorkshopUser = Boolean(currentUser) && currentUser.role !== ROLES.MANAGER;
   const mechanics = users.filter((user) => user.role === ROLES.MECHANIC);
   const sessionUsers = users.filter(
     (user) => user.role === ROLES.MANAGER || user.role === ROLES.SECRETARY || user.role === ROLES.MECHANIC
   );
+
+  useEffect(() => {
+    if (!feedback) {
+      return undefined;
+    }
+
+    const timeoutId = setTimeout(() => {
+      setFeedback(null);
+    }, 2600);
+
+    return () => clearTimeout(timeoutId);
+  }, [feedback]);
 
   const derivedData = useMemo(() => {
     const companiesById = mapById(companies);
@@ -326,8 +340,6 @@ export function AppProvider({ children }) {
     });
 
     const allTrucksById = mapById(trucksWithResolvedRelations);
-    const allIssuesById = mapById(issuesDetailed);
-    const allJobsById = mapById(jobsWithIssueDetails);
     const visibleEntities = getVisibleEntities(
       currentUser,
       trucksWithResolvedRelations,
@@ -372,8 +384,6 @@ export function AppProvider({ children }) {
 
     return {
       allTrucksById,
-      allIssuesById,
-      allJobsById,
       trucks: visibleEntities.trucks,
       issues: visibleEntities.issues,
       jobs: visibleEntities.jobs,
@@ -385,12 +395,25 @@ export function AppProvider({ children }) {
     };
   }, [currentUser, issuesState, jobsState, trucksState]);
 
+  const dismissFeedback = () => {
+    setFeedback(null);
+  };
+
+  const showFeedback = ({ message, tone = 'success' }) => {
+    setFeedback({
+      id: `${Date.now()}`,
+      message,
+      tone,
+    });
+  };
+
   const loginAsUser = (userId) => {
     setCurrentUserId(userId);
   };
 
   const logout = () => {
     setCurrentUserId(null);
+    dismissFeedback();
   };
 
   const reportIssue = ({ truckId, description, priority = PRIORITY.NORMAL, photoUrl = null }) => {
@@ -426,6 +449,9 @@ export function AppProvider({ children }) {
           : currentTruck
       )
     );
+    showFeedback({
+      message: `Issue reported for Truck ${truck.unitNumber}. Workshop queue updated.`,
+    });
 
     return newIssue.id;
   };
@@ -438,6 +464,7 @@ export function AppProvider({ children }) {
     estimatedReturnDate,
   }) => {
     const issue = issuesState.find((item) => item.id === issueId);
+    const truck = trucksState.find((item) => item.id === issue?.truckId);
 
     if (!issue || issue.status !== ISSUE_STATUS.REPORTED || !isWorkshopUser) {
       return null;
@@ -466,16 +493,19 @@ export function AppProvider({ children }) {
       )
     );
     setTrucksState((currentTrucks) =>
-      currentTrucks.map((truck) =>
-        truck.id === issue.truckId
+      currentTrucks.map((currentTruck) =>
+        currentTruck.id === issue.truckId
           ? {
-              ...truck,
+              ...currentTruck,
               warehouseId,
               status: TRUCK_STATUS.OUT_OF_SERVICE,
             }
-          : truck
+          : currentTruck
       )
     );
+    showFeedback({
+      message: `Truck ${truck?.unitNumber || ''} assigned to workshop schedule.`,
+    });
 
     return newJob.id;
   };
@@ -495,6 +525,7 @@ export function AppProvider({ children }) {
 
   const updateJobStatus = (jobId, status) => {
     const targetJob = jobsState.find((job) => job.id === jobId);
+    const targetTruck = trucksState.find((truck) => truck.id === targetJob?.truckId);
 
     if (!targetJob || !isWorkshopUser) {
       return;
@@ -513,6 +544,9 @@ export function AppProvider({ children }) {
 
     if (status === JOB_STATUS.IN_PROGRESS) {
       updateTruckStatus(targetJob.truckId, TRUCK_STATUS.IN_REPAIR);
+      showFeedback({
+        message: `Repair started for Truck ${targetTruck?.unitNumber || ''}.`,
+      });
     }
 
     if (status === JOB_STATUS.DONE) {
@@ -522,6 +556,7 @@ export function AppProvider({ children }) {
 
   const resolveIssue = (issueId) => {
     const targetIssue = issuesState.find((issue) => issue.id === issueId);
+    const targetTruck = trucksState.find((truck) => truck.id === targetIssue?.truckId);
 
     if (!targetIssue || !isWorkshopUser) {
       return;
@@ -548,6 +583,9 @@ export function AppProvider({ children }) {
       )
     );
     updateTruckStatus(targetIssue.truckId, TRUCK_STATUS.BACK_IN_SERVICE);
+    showFeedback({
+      message: `Repair completed for Truck ${targetTruck?.unitNumber || ''}. Back in service.`,
+    });
   };
 
   const completeJobWorkflow = (jobId) => {
@@ -567,10 +605,14 @@ export function AppProvider({ children }) {
     mechanics,
     sessionUsers,
     currentUser,
+    currentCompany,
     currentRole: currentUser?.role || null,
     isAuthenticated: Boolean(currentUser),
     isManager,
     isWorkshopUser,
+    feedback,
+    dismissFeedback,
+    showFeedback,
     trucks: derivedData.trucks,
     issues: derivedData.issues,
     jobs: derivedData.jobs,

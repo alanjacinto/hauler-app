@@ -15,7 +15,13 @@ function MetaStat({ label, value }) {
   );
 }
 
-export default function TruckCard({ truck, onPress }) {
+export default function TruckCard({
+  truck,
+  onPress,
+  onQuickAction,
+  quickActionLabel,
+  showQuickAction = false,
+}) {
   const activeIssue = truck.activeIssue;
   const activeJob = truck.activeJob;
   const needsAttention = Boolean(activeIssue || activeJob);
@@ -77,6 +83,12 @@ export default function TruckCard({ truck, onPress }) {
             />
           </View>
         </View>
+      ) : null}
+
+      {showQuickAction ? (
+        <Pressable style={styles.quickActionButton} onPress={onQuickAction}>
+          <Text style={styles.quickActionText}>{quickActionLabel}</Text>
+        </Pressable>
       ) : null}
     </Pressable>
   );
@@ -211,5 +223,19 @@ const styles = StyleSheet.create({
   jobPanelGrid: {
     flexDirection: 'row',
     gap: 10,
+  },
+  quickActionButton: {
+    alignSelf: 'flex-start',
+    backgroundColor: colors.primaryMuted,
+    borderWidth: 1,
+    borderColor: colors.primary,
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+  },
+  quickActionText: {
+    color: colors.text,
+    fontSize: 12,
+    fontWeight: '800',
   },
 });

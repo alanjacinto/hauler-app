@@ -1,13 +1,23 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { FlatList, StyleSheet, View } from 'react-native';
 import AssignIssueModal from '../components/AssignIssueModal';
 import EmptyState from '../components/EmptyState';
+import FilterChips from '../components/FilterChips';
 import IssueCard from '../components/IssueCard';
 import ScreenHeader from '../components/ScreenHeader';
+import SessionBar from '../components/SessionBar';
 import SummaryCard from '../components/SummaryCard';
 import { useAppData } from '../context/AppContext';
 import colors from '../theme/colors';
 import { ISSUE_STATUS, PRIORITY } from '../utils/constants';
+
+const ISSUE_FILTERS = [
+  { label: 'All', value: 'ALL' },
+  { label: 'Reported', value: ISSUE_STATUS.REPORTED },
+  { label: 'Assigned', value: ISSUE_STATUS.ASSIGNED },
+  { label: 'Resolved', value: ISSUE_STATUS.RESOLVED },
+  { label: 'Urgent', value: 'URGENT_ONLY' },
+];
 
 export default function IssuesScreen({ navigation }) {
   const {
@@ -20,10 +30,22 @@ export default function IssuesScreen({ navigation }) {
   } = useAppData();
   const [selectedIssue, setSelectedIssue] = useState(null);
   const [isAssignModalVisible, setIsAssignModalVisible] = useState(false);
+  const [selectedFilter, setSelectedFilter] = useState('ALL');
 
   const urgentCount = issues.filter((issue) => issue.priority === PRIORITY.URGENT).length;
   const reportedCount = issues.filter((issue) => issue.status === ISSUE_STATUS.REPORTED).length;
   const assignedCount = issues.filter((issue) => issue.status === ISSUE_STATUS.ASSIGNED).length;
+  const filteredIssues = useMemo(() => {
+    if (selectedFilter === 'ALL') {
+      return issues;
+    }
+
+    if (selectedFilter === 'URGENT_ONLY') {
+      return issues.filter((issue) => issue.priority === PRIORITY.URGENT);
+    }
+
+    return issues.filter((issue) => issue.status === selectedFilter);
+  }, [issues, selectedFilter]);
 
   const openAssignModal = (issue) => {
     setSelectedIssue(issue);
@@ -51,12 +73,12 @@ export default function IssuesScreen({ navigation }) {
   return (
     <View style={styles.container}>
       <FlatList
-        data={issues}
         keyExtractor={(item) => item.id}
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.content}
         ListHeaderComponent={
           <View style={styles.headerBlock}>
+            <SessionBar />
             <ScreenHeader
               title="Issues"
               subtitle={`Logged in as ${currentUser?.name}. Triage reported problems, assign repairs, and move work into the shop schedule.`}
@@ -66,6 +88,11 @@ export default function IssuesScreen({ navigation }) {
               <SummaryCard label="Reported" value={reportedCount} tone="warning" />
               <SummaryCard label="Assigned" value={assignedCount} tone="neutral" />
             </View>
+            <FilterChips
+              options={ISSUE_FILTERS}
+              selectedValue={selectedFilter}
+              onSelect={setSelectedFilter}
+            />
           </View>
         }
         ListEmptyComponent={
@@ -76,6 +103,7 @@ export default function IssuesScreen({ navigation }) {
           />
         }
         ItemSeparatorComponent={() => <View style={styles.separator} />}
+        data={filteredIssues}
         renderItem={({ item }) => {
           const canAssign = isWorkshopUser && item.status === ISSUE_STATUS.REPORTED;
           const canViewSchedule =

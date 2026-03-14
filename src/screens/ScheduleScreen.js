@@ -5,6 +5,7 @@ import FilterChips from '../components/FilterChips';
 import ScheduleCard from '../components/ScheduleCard';
 import ScreenHeader from '../components/ScreenHeader';
 import SectionTitle from '../components/SectionTitle';
+import SessionBar from '../components/SessionBar';
 import SummaryCard from '../components/SummaryCard';
 import { useAppData } from '../context/AppContext';
 import { JOB_STATUS } from '../utils/constants';
@@ -123,6 +124,7 @@ export default function ScheduleScreen({ navigation }) {
         contentContainerStyle={styles.content}
         ListHeaderComponent={
           <View style={styles.headerBlock}>
+            <SessionBar />
             <ScreenHeader
               title="Schedule"
               subtitle={`Logged in as ${currentUser?.name}. Manage today’s queue, track repairs in progress, and close completed work.`}

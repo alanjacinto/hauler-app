@@ -5,6 +5,7 @@ import FilterChips from '../components/FilterChips';
 import ReportIssueModal from '../components/ReportIssueModal';
 import ScreenHeader from '../components/ScreenHeader';
 import SearchBar from '../components/SearchBar';
+import SessionBar from '../components/SessionBar';
 import SummaryCard from '../components/SummaryCard';
 import TruckCard from '../components/TruckCard';
 import { useAppData } from '../context/AppContext';
@@ -26,16 +27,15 @@ function HeaderAction({ label, onPress, primary = false }) {
 
 export default function FleetScreen({ navigation }) {
   const {
-    currentUser,
     fleetSummary,
     isManager,
-    logout,
     reportIssue,
     trucks,
   } = useAppData();
   const [query, setQuery] = useState('');
   const [selectedStatus, setSelectedStatus] = useState('ALL');
   const [isReportIssueVisible, setIsReportIssueVisible] = useState(false);
+  const [selectedTruck, setSelectedTruck] = useState(null);
 
   const filteredTrucks = useMemo(() => {
     const normalizedQuery = query.trim().toLowerCase();
@@ -73,12 +73,14 @@ export default function FleetScreen({ navigation }) {
         contentContainerStyle={styles.content}
         ListHeaderComponent={
           <View style={styles.headerBlock}>
+            <SessionBar />
+
             <ScreenHeader
               title="Fleet"
               subtitle={
                 isManager
-                  ? `Logged in as ${currentUser?.name}. You can report issues and monitor repair progress for your fleet.`
-                  : `Logged in as ${currentUser?.name}. You can inspect the fleet while managing workshop execution.`
+                  ? 'Report issues quickly and monitor the current repair state of every truck in your fleet.'
+                  : 'Inspect the fleet while managing workshop execution and field repairs.'
               }
             />
 
@@ -86,11 +88,13 @@ export default function FleetScreen({ navigation }) {
               {isManager ? (
                 <HeaderAction
                   label="Report issue"
-                  onPress={() => setIsReportIssueVisible(true)}
+                  onPress={() => {
+                    setSelectedTruck(null);
+                    setIsReportIssueVisible(true);
+                  }}
                   primary
                 />
               ) : null}
-              <HeaderAction label="Switch user" onPress={logout} />
             </View>
 
             <View style={styles.summaryGrid}>
@@ -148,6 +152,12 @@ export default function FleetScreen({ navigation }) {
           <TruckCard
             truck={item}
             onPress={() => navigation.navigate('TruckDetail', { truckId: item.id })}
+            quickActionLabel="Report issue"
+            showQuickAction={isManager && !item.activeIssue && !item.activeJob}
+            onQuickAction={() => {
+              setSelectedTruck(item);
+              setIsReportIssueVisible(true);
+            }}
           />
         )}
       />
@@ -155,9 +165,11 @@ export default function FleetScreen({ navigation }) {
       <ReportIssueModal
         visible={isReportIssueVisible}
         trucks={trucks}
+        initialTruck={selectedTruck}
         onClose={() => setIsReportIssueVisible(false)}
         onSubmit={(payload) => {
           reportIssue(payload);
+          setSelectedTruck(null);
           setIsReportIssueVisible(false);
         }}
       />

@@ -1,4 +1,5 @@
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
+import FeedbackBanner from '../components/FeedbackBanner';
 import { useAppData } from '../context/AppContext';
 import colors from '../theme/colors';
 import MainTabNavigator from './MainTabNavigator';
@@ -11,35 +12,38 @@ export default function AppNavigator() {
   const { isAuthenticated } = useAppData();
 
   return (
-    <Stack.Navigator
-      screenOptions={{
-        headerStyle: {
-          backgroundColor: colors.surface,
-        },
-        headerTintColor: colors.text,
-        headerShadowVisible: false,
-        headerBackTitleVisible: false,
-        contentStyle: {
-          backgroundColor: colors.background,
-        },
-      }}
-    >
-      {!isAuthenticated ? (
-        <Stack.Screen
-          name="SessionSelection"
-          component={SessionSelectionScreen}
-          options={{ headerShown: false }}
-        />
-      ) : (
-        <>
-          <Stack.Screen name="Home" component={MainTabNavigator} options={{ headerShown: false }} />
+    <>
+      <Stack.Navigator
+        screenOptions={{
+          headerStyle: {
+            backgroundColor: colors.surface,
+          },
+          headerTintColor: colors.text,
+          headerShadowVisible: false,
+          headerBackTitleVisible: false,
+          contentStyle: {
+            backgroundColor: colors.background,
+          },
+        }}
+      >
+        {!isAuthenticated ? (
           <Stack.Screen
-            name="TruckDetail"
-            component={TruckDetailScreen}
-            options={{ title: 'Truck detail' }}
+            name="SessionSelection"
+            component={SessionSelectionScreen}
+            options={{ headerShown: false }}
           />
-        </>
-      )}
-    </Stack.Navigator>
+        ) : (
+          <>
+            <Stack.Screen name="Home" component={MainTabNavigator} options={{ headerShown: false }} />
+            <Stack.Screen
+              name="TruckDetail"
+              component={TruckDetailScreen}
+              options={{ title: 'Truck detail' }}
+            />
+          </>
+        )}
+      </Stack.Navigator>
+      <FeedbackBanner />
+    </>
   );
 }
