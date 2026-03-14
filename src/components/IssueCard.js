@@ -4,7 +4,13 @@ import colors from '../theme/colors';
 import { formatDateTime, getJobStatusLabel } from '../utils/formatters';
 import StatusBadge from './StatusBadge';
 
-export default function IssueCard({ issue, onPressTruck, onPressSchedule }) {
+export default function IssueCard({
+  issue,
+  onPressTruck,
+  onPressPrimary,
+  primaryLabel,
+  showPrimaryAction = true,
+}) {
   return (
     <View style={styles.card}>
       <View style={styles.header}>
@@ -47,12 +53,16 @@ export default function IssueCard({ issue, onPressTruck, onPressSchedule }) {
           <Text style={styles.secondaryText}>Truck detail</Text>
         </Pressable>
 
-        <Pressable style={styles.primaryButton} onPress={onPressSchedule}>
-          <Ionicons name="calendar-outline" size={16} color={colors.text} />
-          <Text style={styles.primaryText}>
-            {issue.currentJob ? 'View schedule' : 'Create job'}
-          </Text>
-        </Pressable>
+        {showPrimaryAction ? (
+          <Pressable style={styles.primaryButton} onPress={onPressPrimary}>
+            <Ionicons
+              name={primaryLabel === 'Assign' ? 'construct-outline' : 'calendar-outline'}
+              size={16}
+              color={colors.text}
+            />
+            <Text style={styles.primaryText}>{primaryLabel}</Text>
+          </Pressable>
+        ) : null}
       </View>
     </View>
   );
