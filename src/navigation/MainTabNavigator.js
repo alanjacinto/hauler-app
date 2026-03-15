@@ -4,6 +4,7 @@ import { useAppData } from '../context/AppContext';
 import colors from '../theme/colors';
 import FleetScreen from '../screens/FleetScreen';
 import IssuesScreen from '../screens/IssuesScreen';
+import OrganizationScreen from '../screens/OrganizationScreen';
 import ScheduleScreen from '../screens/ScheduleScreen';
 
 const Tab = createBottomTabNavigator();
@@ -12,6 +13,7 @@ const TAB_ICONS = {
   Fleet: 'bus-outline',
   Issues: 'alert-circle-outline',
   Schedule: 'calendar-outline',
+  Workspace: 'business-outline',
 };
 
 export default function MainTabNavigator() {
@@ -43,6 +45,14 @@ export default function MainTabNavigator() {
       <Tab.Screen name="Fleet" component={FleetScreen} />
       {!isManager ? <Tab.Screen name="Issues" component={IssuesScreen} /> : null}
       {!isManager ? <Tab.Screen name="Schedule" component={ScheduleScreen} /> : null}
+      <Tab.Screen
+        name="Workspace"
+        component={OrganizationScreen}
+        options={{
+          title: isManager ? 'Company' : 'Workshop',
+          tabBarLabel: isManager ? 'Company' : 'Workshop',
+        }}
+      />
     </Tab.Navigator>
   );
 }

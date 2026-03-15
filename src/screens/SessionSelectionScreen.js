@@ -6,21 +6,34 @@ import { ROLES } from '../utils/constants';
 
 const ROLE_COPY = {
   [ROLES.MANAGER]: {
-    title: 'Fleet Manager',
-    description: 'Report truck issues, track fleet health, and monitor repair progress.',
+    title: 'Contractor Manager',
+    description:
+      'Own the company profile, add fleet assets, report truck issues, and control workshop access.',
   },
   [ROLES.SECRETARY]: {
     title: 'Workshop Coordinator',
-    description: 'Triage new issues, assign mechanics, and organize the repair queue.',
+    description:
+      'Run workshop operations, manage company links, assign jobs, and organize the repair queue.',
   },
   [ROLES.MECHANIC]: {
     title: 'Mechanic',
-    description: 'See today’s jobs, start repairs, and complete work in the field.',
+    description:
+      'Handle active workshop jobs, track the repair schedule, and update execution progress.',
   },
 };
 
 export default function SessionSelectionScreen() {
-  const { loginAsUser, sessionUsers } = useAppData();
+  const { companies, loginAsUser, sessionUsers, workshops } = useAppData();
+
+  const companiesById = companies.reduce((accumulator, company) => {
+    accumulator[company.id] = company;
+    return accumulator;
+  }, {});
+
+  const workshopsById = workshops.reduce((accumulator, workshop) => {
+    accumulator[workshop.id] = workshop;
+    return accumulator;
+  }, {});
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -30,16 +43,24 @@ export default function SessionSelectionScreen() {
         showsVerticalScrollIndicator={false}
       >
         <View style={styles.hero}>
-          <Text style={styles.eyebrow}>Hauler MVP</Text>
+          <Text style={styles.eyebrow}>Hauler Network MVP</Text>
           <Text style={styles.title}>Choose a demo session</Text>
           <Text style={styles.subtitle}>
-            Switch between manager and workshop roles to show the full end-to-end operational flow.
+            This build now models private workshop-company relationships. Workshops only see linked
+            fleets, and companies keep ownership of their own fleet records.
           </Text>
         </View>
 
         <View style={styles.cards}>
           {sessionUsers.map((user) => {
             const roleCopy = ROLE_COPY[user.role];
+            const company = user.companyId ? companiesById[user.companyId] : null;
+            const workshop = user.workshopId ? workshopsById[user.workshopId] : null;
+            const orgMeta = company
+              ? `${company.name} • ${company.trucks.length} trucks`
+              : workshop
+                ? `${workshop.name} • ${workshop.linkedCompanies.length} linked companies`
+                : 'No organization assigned';
 
             return (
               <Pressable
@@ -59,9 +80,14 @@ export default function SessionSelectionScreen() {
 
                 <Text style={styles.cardDescription}>{roleCopy.description}</Text>
 
+                <View style={styles.orgCard}>
+                  <Text style={styles.orgLabel}>Organization context</Text>
+                  <Text style={styles.orgText}>{orgMeta}</Text>
+                </View>
+
                 <View style={styles.footerRow}>
                   <Text style={styles.footerLabel}>
-                    {user.companyId ? 'Company scoped session' : 'Workshop operational session'}
+                    {company ? 'Company-owned fleet session' : 'Workshop operational session'}
                   </Text>
                   <Text style={styles.footerAction}>Enter</Text>
                 </View>
@@ -157,6 +183,24 @@ const styles = StyleSheet.create({
     color: colors.text,
     fontSize: 14,
     lineHeight: 21,
+  },
+  orgCard: {
+    backgroundColor: colors.surfaceMuted,
+    borderRadius: 16,
+    padding: 14,
+    gap: 5,
+  },
+  orgLabel: {
+    color: colors.textSoft,
+    fontSize: 12,
+    fontWeight: '700',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  orgText: {
+    color: colors.text,
+    fontSize: 14,
+    lineHeight: 20,
   },
   footerRow: {
     flexDirection: 'row',

@@ -11,6 +11,7 @@ import colors from '../theme/colors';
 import {
   formatDateLabel,
   formatDateTime,
+  getFuelTypeLabel,
   getJobStatusLabel,
   getIssueStatusLabel,
 } from '../utils/formatters';
@@ -131,7 +132,7 @@ export default function TruckDetailScreen({ route }) {
 
         <ScreenHeader
           title={`Truck ${truck.unitNumber}`}
-          subtitle={`${truck.company?.name} • ${truck.warehouse?.name}`}
+          subtitle={`${truck.make} • ${truck.licensePlate}`}
           right={<StatusBadge status={truck.status} />}
         />
 
@@ -184,10 +185,14 @@ export default function TruckDetailScreen({ route }) {
           <SectionTitle title="Truck profile" />
           <View style={styles.stack}>
             <DetailRow label="Unit number" value={truck.unitNumber} />
+            <DetailRow label="License plate" value={truck.licensePlate} />
             <DetailRow label="VIN" value={truck.vin} />
+            <DetailRow label="Make / brand" value={truck.make} />
+            <DetailRow label="Fuel type" value={getFuelTypeLabel(truck.fuelType)} />
             <DetailRow label="Company" value={truck.company?.name} />
             <DetailRow label="Warehouse" value={truck.warehouse?.name} />
             <DetailRow label="Warehouse address" value={truck.warehouse?.address} />
+            <DetailRow label="Notes" value={truck.notes || 'No operating notes'} />
           </View>
         </DetailCard>
 

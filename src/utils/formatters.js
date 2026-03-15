@@ -1,6 +1,8 @@
 import {
+  FUEL_TYPE_LABELS,
   ISSUE_STATUS_LABELS,
   JOB_STATUS_LABELS,
+  LINK_STATUS_LABELS,
   PRIORITY_LABELS,
   TRUCK_STATUS_LABELS,
 } from './constants';
@@ -50,6 +52,14 @@ export function getJobStatusLabel(status) {
   return JOB_STATUS_LABELS[status] || status;
 }
 
+export function getLinkStatusLabel(status) {
+  return LINK_STATUS_LABELS[status] || status;
+}
+
 export function getPriorityLabel(priority) {
   return PRIORITY_LABELS[priority] || priority;
+}
+
+export function getFuelTypeLabel(fuelType) {
+  return FUEL_TYPE_LABELS[fuelType] || fuelType;
 }

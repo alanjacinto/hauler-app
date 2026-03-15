@@ -26,12 +26,7 @@ function HeaderAction({ label, onPress, primary = false }) {
 }
 
 export default function FleetScreen({ navigation }) {
-  const {
-    fleetSummary,
-    isManager,
-    reportIssue,
-    trucks,
-  } = useAppData();
+  const { fleetSummary, isManager, reportIssue, trucks } = useAppData();
   const [query, setQuery] = useState('');
   const [selectedStatus, setSelectedStatus] = useState('ALL');
   const [isReportIssueVisible, setIsReportIssueVisible] = useState(false);
@@ -45,6 +40,8 @@ export default function FleetScreen({ navigation }) {
         const matchesQuery =
           truck.unitNumber.toLowerCase().includes(normalizedQuery) ||
           truck.vin.toLowerCase().includes(normalizedQuery) ||
+          truck.licensePlate.toLowerCase().includes(normalizedQuery) ||
+          truck.make.toLowerCase().includes(normalizedQuery) ||
           truck.company?.name?.toLowerCase().includes(normalizedQuery) ||
           truck.warehouse?.name?.toLowerCase().includes(normalizedQuery);
 
@@ -79,21 +76,29 @@ export default function FleetScreen({ navigation }) {
               title="Fleet"
               subtitle={
                 isManager
-                  ? 'Report issues quickly and monitor the current repair state of every truck in your fleet.'
-                  : 'Inspect the fleet while managing workshop execution and field repairs.'
+                  ? 'Monitor company-owned fleet assets, report new issues, and keep truck setup current.'
+                  : 'Inspect the linked contractor fleet while managing workshop execution and field repairs.'
               }
             />
 
             <View style={styles.actionRow}>
               {isManager ? (
-                <HeaderAction
-                  label="Report issue"
-                  onPress={() => {
-                    setSelectedTruck(null);
-                    setIsReportIssueVisible(true);
-                  }}
-                  primary
-                />
+                <>
+                  <HeaderAction
+                    label="Add truck"
+                    onPress={() => navigation.navigate('Workspace')}
+                  />
+                  {trucks.length ? (
+                    <HeaderAction
+                      label="Report issue"
+                      onPress={() => {
+                        setSelectedTruck(null);
+                        setIsReportIssueVisible(true);
+                      }}
+                      primary
+                    />
+                  ) : null}
+                </>
               ) : null}
             </View>
 
@@ -125,7 +130,7 @@ export default function FleetScreen({ navigation }) {
               <SearchBar
                 value={query}
                 onChangeText={setQuery}
-                placeholder="Search by truck, VIN, company, or warehouse"
+                placeholder="Search by truck, plate, make, VIN, company, or warehouse"
               />
 
               <FilterChips
@@ -143,9 +148,13 @@ export default function FleetScreen({ navigation }) {
         }
         ListEmptyComponent={
           <EmptyState
-            icon="search-outline"
-            title="No trucks found"
-            description="Try another truck number, VIN, warehouse, or status filter."
+            icon="bus-outline"
+            title={isManager ? 'No fleet trucks yet' : 'No linked fleet trucks'}
+            description={
+              isManager
+                ? 'Set up your company fleet in the Company tab to start reporting issues and tracking repair work.'
+                : 'Workshop fleet visibility only appears after a company is actively linked to this workshop.'
+            }
           />
         }
         renderItem={({ item }) => (

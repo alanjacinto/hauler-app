@@ -3,7 +3,14 @@ import { useAppData } from '../context/AppContext';
 import colors from '../theme/colors';
 
 export default function SessionBar() {
-  const { currentCompany, currentRole, currentUser, isManager, logout } = useAppData();
+  const {
+    currentCompany,
+    currentRole,
+    currentUser,
+    currentWorkshop,
+    isManager,
+    logout,
+  } = useAppData();
 
   if (!currentUser) {
     return null;
@@ -16,7 +23,9 @@ export default function SessionBar() {
         <Text style={styles.meta}>
           {currentRole}
           {' • '}
-          {isManager ? currentCompany?.name || 'Fleet company' : 'Workshop operations'}
+          {isManager
+            ? currentCompany?.name || 'Company account'
+            : currentWorkshop?.name || 'Workshop account'}
         </Text>
       </View>
 

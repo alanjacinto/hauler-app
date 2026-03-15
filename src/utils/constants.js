@@ -22,10 +22,22 @@ export const JOB_STATUS = {
   DONE: 'DONE',
 };
 
+export const LINK_STATUS = {
+  INVITED: 'INVITED',
+  ACTIVE: 'ACTIVE',
+  REMOVED: 'REMOVED',
+};
+
 export const PRIORITY = {
   URGENT: 'URGENT',
   NORMAL: 'NORMAL',
   LOW: 'LOW',
+};
+
+export const FUEL_TYPES = {
+  DIESEL: 'DIESEL',
+  ELECTRIC: 'ELECTRIC',
+  HYBRID: 'HYBRID',
 };
 
 export const TRUCK_STATUS_OPTIONS = [
@@ -59,10 +71,22 @@ export const JOB_STATUS_LABELS = {
   [JOB_STATUS.DONE]: 'Done',
 };
 
+export const LINK_STATUS_LABELS = {
+  [LINK_STATUS.INVITED]: 'Invited',
+  [LINK_STATUS.ACTIVE]: 'Active',
+  [LINK_STATUS.REMOVED]: 'Removed',
+};
+
 export const PRIORITY_LABELS = {
   [PRIORITY.URGENT]: 'Urgent',
   [PRIORITY.NORMAL]: 'Normal',
   [PRIORITY.LOW]: 'Low',
+};
+
+export const FUEL_TYPE_LABELS = {
+  [FUEL_TYPES.DIESEL]: 'Diesel',
+  [FUEL_TYPES.ELECTRIC]: 'Electric',
+  [FUEL_TYPES.HYBRID]: 'Hybrid',
 };
 
 export const TRUCK_STATUS_LABELS = {

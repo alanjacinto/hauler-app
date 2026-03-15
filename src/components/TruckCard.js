@@ -1,7 +1,12 @@
 import { Ionicons } from '@expo/vector-icons';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import colors from '../theme/colors';
-import { formatDateLabel, getJobStatusLabel, getIssueStatusLabel } from '../utils/formatters';
+import {
+  formatDateLabel,
+  getFuelTypeLabel,
+  getJobStatusLabel,
+  getIssueStatusLabel,
+} from '../utils/formatters';
 import StatusBadge from './StatusBadge';
 
 function MetaStat({ label, value }) {
@@ -32,6 +37,9 @@ export default function TruckCard({
         <View style={styles.identity}>
           <Text style={styles.unit}>Truck {truck.unitNumber}</Text>
           <Text style={styles.subtext}>
+            {truck.make} • {truck.licensePlate}
+          </Text>
+          <Text style={styles.subtextSecondary}>
             {truck.company?.name} • {truck.warehouse?.name}
           </Text>
         </View>
@@ -45,11 +53,9 @@ export default function TruckCard({
       </View>
 
       <View style={styles.metaGrid}>
+        <MetaStat label="Fuel" value={getFuelTypeLabel(truck.fuelType)} />
         <MetaStat label="VIN" value={truck.vin} />
-        <MetaStat
-          label="Mechanic"
-          value={activeJob?.mechanic?.name || 'Not assigned'}
-        />
+        <MetaStat label="Mechanic" value={activeJob?.mechanic?.name || 'Not assigned'} />
       </View>
 
       {activeIssue ? (
@@ -77,10 +83,7 @@ export default function TruckCard({
           </View>
           <View style={styles.jobPanelGrid}>
             <MetaStat label="Warehouse" value={activeJob.warehouse?.name || 'Unassigned'} />
-            <MetaStat
-              label="Return ETA"
-              value={formatDateLabel(activeJob.estimatedReturnDate)}
-            />
+            <MetaStat label="Return ETA" value={formatDateLabel(activeJob.estimatedReturnDate)} />
           </View>
         </View>
       ) : null}
@@ -123,8 +126,13 @@ const styles = StyleSheet.create({
     fontWeight: '800',
   },
   subtext: {
-    color: colors.textMuted,
+    color: colors.text,
     fontSize: 14,
+    fontWeight: '600',
+  },
+  subtextSecondary: {
+    color: colors.textMuted,
+    fontSize: 13,
   },
   statusRow: {
     flexDirection: 'row',

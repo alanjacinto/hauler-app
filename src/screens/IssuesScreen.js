@@ -134,7 +134,9 @@ export default function IssuesScreen({ navigation }) {
         visible={isAssignModalVisible}
         issue={selectedIssue}
         mechanics={mechanics}
-        warehouses={warehouses}
+        warehouses={warehouses.filter(
+          (warehouse) => warehouse.company?.id === selectedIssue?.company?.id
+        )}
         onClose={closeAssignModal}
         onSubmit={handleAssignIssue}
       />
