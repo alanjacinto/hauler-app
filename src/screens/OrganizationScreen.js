@@ -10,15 +10,8 @@ import StatusBadge from '../components/StatusBadge';
 import SummaryCard from '../components/SummaryCard';
 import { useAppData } from '../context/AppContext';
 import colors from '../theme/colors';
-import {
-  FUEL_TYPES,
-  LINK_STATUS,
-  ROLES,
-} from '../utils/constants';
-import {
-  getFuelTypeLabel,
-  getLinkStatusLabel,
-} from '../utils/formatters';
+import { FUEL_TYPES, LINK_STATUS, ROLES } from '../utils/constants';
+import { getFuelTypeLabel, getLinkStatusLabel } from '../utils/formatters';
 
 const STAFF_ROLE_OPTIONS = [
   { label: 'Mechanic', value: ROLES.MECHANIC },
@@ -87,6 +80,35 @@ function SelectCard({ label, description, selected, onPress }) {
   );
 }
 
+function SetupChecklist({ setup }) {
+  if (!setup) {
+    return null;
+  }
+
+  return (
+    <View style={styles.setupChecklist}>
+      {setup.checklist.map((item) => (
+        <View key={item.id} style={styles.setupItem}>
+          <View
+            style={[
+              styles.setupDot,
+              item.complete ? styles.setupDotComplete : styles.setupDotPending,
+            ]}
+          />
+          <Text
+            style={[
+              styles.setupItemText,
+              item.complete ? styles.setupItemTextComplete : styles.setupItemTextPending,
+            ]}
+          >
+            {item.label}
+          </Text>
+        </View>
+      ))}
+    </View>
+  );
+}
+
 export default function OrganizationScreen() {
   const {
     addTruck,
@@ -98,11 +120,13 @@ export default function OrganizationScreen() {
     currentCompany,
     currentCompanyInvitations,
     currentCompanyLinkedWorkshops,
+    currentCompanySetup,
     currentCompanyTrucks,
     currentCompanyWarehouses,
     currentWorkshop,
     currentWorkshopLinkedCompanies,
     currentWorkshopLinks,
+    currentWorkshopSetup,
     currentWorkshopStaff,
     isManager,
     updateCompanyProfile,
@@ -137,9 +161,7 @@ export default function OrganizationScreen() {
     name: '',
     role: ROLES.MECHANIC,
   });
-  const [inviteCompanyId, setInviteCompanyId] = useState(
-    availableCompaniesForInvite[0]?.id || ''
-  );
+  const [inviteCompanyId, setInviteCompanyId] = useState(availableCompaniesForInvite[0]?.id || '');
 
   const companyLinkSummary = useMemo(
     () => ({
@@ -192,6 +214,8 @@ export default function OrganizationScreen() {
   const hasCompanyProfile = Boolean(
     currentCompany?.address && currentCompany?.contactName && currentCompany?.contactPhone
   );
+  const hasWorkshopProfile = Boolean(currentWorkshop?.name && currentWorkshop?.address);
+  const setup = isManager ? currentCompanySetup : currentWorkshopSetup;
 
   return (
     <ScrollView
@@ -209,6 +233,39 @@ export default function OrganizationScreen() {
             : 'Manage your workshop profile, internal staff, and private company relationships.'
         }
       />
+
+      <ListCard
+        title={isManager ? 'Beta readiness' : 'Workshop readiness'}
+        subtitle={
+          setup?.isComplete
+            ? 'This organization is configured for internal beta testing and repeatable demos.'
+            : setup?.nextStep || 'Finish the remaining setup steps to make this organization test-ready.'
+        }
+      >
+        <View style={styles.readinessHeader}>
+          <View>
+            <Text style={styles.readinessTitle}>
+              {setup?.completedCount || 0}/{setup?.totalCount || 0} steps complete
+            </Text>
+            <Text style={styles.readinessCopy}>
+              {isManager
+                ? 'Company setup controls what the fleet can report and which workshop can act on it.'
+                : 'Workshop setup controls which companies are visible and which staff can operate the queue.'}
+            </Text>
+          </View>
+          <View
+            style={[
+              styles.readinessBadge,
+              setup?.isComplete ? styles.readinessBadgeReady : styles.readinessBadgePending,
+            ]}
+          >
+            <Text style={styles.readinessBadgeText}>
+              {setup?.isComplete ? 'Ready' : 'In setup'}
+            </Text>
+          </View>
+        </View>
+        <SetupChecklist setup={setup} />
+      </ListCard>
 
       {isManager ? (
         <>
@@ -249,12 +306,15 @@ export default function OrganizationScreen() {
             subtitle="Add bases and trucks with realistic fields so workshop operations run on company-owned assets."
           >
             <View style={styles.buttonRow}>
-              <ActionButton
-                label="Add truck"
-                primary
-                onPress={() => openCompanySheet('truck')}
-              />
+              <ActionButton label="Add truck" primary onPress={() => openCompanySheet('truck')} />
             </View>
+            {currentCompanyWarehouses.length ? null : (
+              <View style={styles.inlineHint}>
+                <Text style={styles.inlineHintText}>
+                  Add a warehouse first so trucks can be assigned to a real operating base.
+                </Text>
+              </View>
+            )}
             {currentCompanyTrucks.length ? (
               <View style={styles.listGroup}>
                 {currentCompanyTrucks.map((truck) => (
@@ -283,11 +343,7 @@ export default function OrganizationScreen() {
             {currentCompanyWarehouses.length ? (
               <View style={styles.listGroup}>
                 {currentCompanyWarehouses.map((warehouse) => (
-                  <RowItem
-                    key={warehouse.id}
-                    title={warehouse.name}
-                    subtitle={warehouse.address}
-                  />
+                  <RowItem key={warehouse.id} title={warehouse.name} subtitle={warehouse.address} />
                 ))}
               </View>
             ) : (
@@ -347,37 +403,22 @@ export default function OrganizationScreen() {
       ) : (
         <>
           <View style={styles.summaryRow}>
-            <StatCard
-              label="Workshop staff"
-              value={currentWorkshopStaff.length}
-              tone="neutral"
-            />
-            <StatCard
-              label="Active companies"
-              value={companyLinkSummary.active}
-              tone="success"
-            />
-            <StatCard
-              label="Pending invites"
-              value={companyLinkSummary.invited}
-              tone="warning"
-            />
+            <StatCard label="Workshop staff" value={currentWorkshopStaff.length} tone="neutral" />
+            <StatCard label="Active companies" value={companyLinkSummary.active} tone="success" />
+            <StatCard label="Pending invites" value={companyLinkSummary.invited} tone="warning" />
           </View>
 
           <ListCard
             title={currentWorkshop?.name || 'Workshop profile'}
-            subtitle="This workshop is the private network anchor for staff and linked fleet companies."
+            subtitle={
+              hasWorkshopProfile
+                ? 'Workshop identity is ready for internal coordination and private company access.'
+                : 'Complete the workshop identity so new staff and company links feel operationally credible.'
+            }
           >
             <View style={styles.buttonRow}>
-              <ActionButton
-                label="Edit workshop"
-                primary
-                onPress={() => openWorkshopSheet('workshop')}
-              />
-              <ActionButton
-                label="Add staff"
-                onPress={() => openWorkshopSheet('staff')}
-              />
+              <ActionButton label="Edit workshop" primary onPress={() => openWorkshopSheet('workshop')} />
+              <ActionButton label="Add staff" onPress={() => openWorkshopSheet('staff')} />
             </View>
             <Text style={styles.metaLine}>{currentWorkshop?.address || 'Workshop address not set'}</Text>
           </ListCard>
@@ -392,7 +433,11 @@ export default function OrganizationScreen() {
                   <RowItem
                     key={user.id}
                     title={user.name}
-                    subtitle={user.id === currentWorkshop?.ownerUserId ? 'Workshop owner' : 'Internal workshop staff'}
+                    subtitle={
+                      user.id === currentWorkshop?.ownerUserId
+                        ? 'Workshop owner'
+                        : 'Internal workshop staff'
+                    }
                     meta={user.role}
                   />
                 ))}
@@ -411,11 +456,7 @@ export default function OrganizationScreen() {
             subtitle="Only linked companies can be seen by this workshop. Invitations stay private until accepted."
           >
             <View style={styles.buttonRow}>
-              <ActionButton
-                label="Invite company"
-                primary
-                onPress={() => openWorkshopSheet('invite')}
-              />
+              <ActionButton label="Invite company" primary onPress={() => openWorkshopSheet('invite')} />
             </View>
 
             {currentWorkshopLinkedCompanies.length ? (
@@ -444,7 +485,13 @@ export default function OrganizationScreen() {
                     />
                   ))}
               </View>
-            ) : null}
+            ) : currentWorkshopLinkedCompanies.length ? null : (
+              <EmptyState
+                icon="business-outline"
+                title="No companies linked yet"
+                description="Invite a company to create a private relationship. Fleet data becomes visible only after acceptance."
+              />
+            )}
           </ListCard>
         </>
       )}
@@ -517,9 +564,7 @@ export default function OrganizationScreen() {
         <FormField
           label="Address"
           value={warehouseDraft.address}
-          onChangeText={(value) =>
-            setWarehouseDraft((current) => ({ ...current, address: value }))
-          }
+          onChangeText={(value) => setWarehouseDraft((current) => ({ ...current, address: value }))}
           placeholder="Base or yard location"
         />
       </FormSheet>
@@ -625,9 +670,7 @@ export default function OrganizationScreen() {
         <FormField
           label="Workshop address"
           value={workshopDraft.address}
-          onChangeText={(value) =>
-            setWorkshopDraft((current) => ({ ...current, address: value }))
-          }
+          onChangeText={(value) => setWorkshopDraft((current) => ({ ...current, address: value }))}
           placeholder="Shop address"
         />
       </FormSheet>
@@ -736,6 +779,74 @@ const styles = StyleSheet.create({
     fontSize: 13,
     lineHeight: 19,
   },
+  readinessHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    gap: 12,
+  },
+  readinessTitle: {
+    color: colors.text,
+    fontSize: 16,
+    fontWeight: '800',
+    marginBottom: 4,
+  },
+  readinessCopy: {
+    color: colors.textMuted,
+    fontSize: 13,
+    lineHeight: 19,
+    maxWidth: 260,
+  },
+  readinessBadge: {
+    borderRadius: 999,
+    paddingHorizontal: 10,
+    paddingVertical: 7,
+    borderWidth: 1,
+  },
+  readinessBadgeReady: {
+    backgroundColor: colors.successMuted,
+    borderColor: colors.success,
+  },
+  readinessBadgePending: {
+    backgroundColor: colors.warningMuted,
+    borderColor: colors.warning,
+  },
+  readinessBadgeText: {
+    color: colors.text,
+    fontSize: 11,
+    fontWeight: '800',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  setupChecklist: {
+    gap: 10,
+  },
+  setupItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  setupDot: {
+    width: 9,
+    height: 9,
+    borderRadius: 999,
+  },
+  setupDotComplete: {
+    backgroundColor: colors.success,
+  },
+  setupDotPending: {
+    backgroundColor: colors.warning,
+  },
+  setupItemText: {
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  setupItemTextComplete: {
+    color: colors.text,
+  },
+  setupItemTextPending: {
+    color: colors.textMuted,
+  },
   buttonRow: {
     flexDirection: 'row',
     gap: 10,
@@ -758,7 +869,19 @@ const styles = StyleSheet.create({
   },
   actionButtonTextPrimary: {
     color: colors.overlay,
-    fontWeight: '800',
+  },
+  inlineHint: {
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.overlay,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+  },
+  inlineHintText: {
+    color: colors.textMuted,
+    fontSize: 12,
+    lineHeight: 18,
   },
   metaBlock: {
     gap: 4,
@@ -774,10 +897,10 @@ const styles = StyleSheet.create({
   rowItem: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    gap: 12,
-    backgroundColor: colors.surfaceMuted,
-    borderRadius: 14,
-    padding: 12,
+    gap: 14,
+    paddingVertical: 10,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: colors.border,
   },
   rowCopy: {
     flex: 1,
@@ -795,7 +918,7 @@ const styles = StyleSheet.create({
   },
   rowRight: {
     alignItems: 'flex-end',
-    gap: 8,
+    gap: 6,
   },
   rowMeta: {
     color: colors.textSoft,
@@ -803,18 +926,17 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   inviteCard: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    gap: 12,
     backgroundColor: colors.surfaceMuted,
-    borderRadius: 14,
+    borderRadius: 16,
     padding: 12,
+    flexDirection: 'row',
+    gap: 12,
+    alignItems: 'center',
   },
   inlinePrimaryButton: {
-    alignSelf: 'center',
     backgroundColor: colors.primary,
     borderRadius: 12,
-    paddingHorizontal: 12,
+    paddingHorizontal: 14,
     paddingVertical: 10,
   },
   inlinePrimaryButtonText: {
@@ -827,8 +949,8 @@ const styles = StyleSheet.create({
   },
   sectionLabel: {
     color: colors.text,
-    fontSize: 14,
-    fontWeight: '700',
+    fontSize: 13,
+    fontWeight: '800',
   },
   optionList: {
     gap: 10,
@@ -837,13 +959,13 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surfaceMuted,
     borderRadius: 16,
     borderWidth: 1,
-    borderColor: colors.border,
+    borderColor: 'transparent',
     padding: 14,
     gap: 4,
   },
   selectCardSelected: {
-    backgroundColor: colors.primaryMuted,
     borderColor: colors.primary,
+    backgroundColor: colors.primaryMuted,
   },
   selectLabel: {
     color: colors.text,

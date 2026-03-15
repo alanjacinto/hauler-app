@@ -1,15 +1,5 @@
 import { createContext, useContext, useEffect, useMemo, useState } from 'react';
 import {
-  companies as initialCompanies,
-  companyWorkshopLinks as initialCompanyWorkshopLinks,
-  issues as initialIssues,
-  jobs as initialJobs,
-  trucks as initialTrucks,
-  users as initialUsers,
-  warehouses as initialWarehouses,
-  workshops as initialWorkshops,
-} from '../data/mockData';
-import {
   FUEL_TYPES,
   ISSUE_STATUS,
   JOB_STATUS,
@@ -18,6 +8,18 @@ import {
   ROLES,
   TRUCK_STATUS,
 } from '../utils/constants';
+import {
+  createSeededAppState,
+  getCompanySetupStatus,
+  getVisibleCompanyIds,
+  getWorkshopSetupStatus,
+  normalizeAppState,
+} from '../utils/appData';
+import {
+  loadPersistedAppState,
+  resetPersistedAppState,
+  savePersistedAppState,
+} from '../storage/appStorage';
 
 const AppContext = createContext(null);
 
@@ -93,15 +95,7 @@ function getCurrentJob(jobsForTruck) {
 }
 
 function createEntityId(prefix) {
-  return `${prefix}-${Date.now()}`;
-}
-
-function addIdToList(items, id) {
-  if (items.includes(id)) {
-    return items;
-  }
-
-  return [...items, id];
+  return `${prefix}-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
 }
 
 function getTruckActivity(truck, issuesForTruck, jobsForTruck) {
@@ -168,49 +162,52 @@ function getTruckActivity(truck, issuesForTruck, jobsForTruck) {
   return sortByDateDescending([...issueEvents, ...jobEvents], 'occurredAt');
 }
 
-function getVisibleCompanyIds(currentUser, currentWorkshop, links) {
-  if (!currentUser) {
-    return [];
-  }
-
-  if (currentUser.role === ROLES.MANAGER) {
-    return currentUser.companyId ? [currentUser.companyId] : [];
-  }
-
-  if (!currentWorkshop) {
-    return [];
-  }
-
-  return links
-    .filter(
-      (link) =>
-        link.workshopId === currentWorkshop.id &&
-        link.status === LINK_STATUS.ACTIVE
-    )
-    .map((link) => link.companyId);
-}
-
 export function AppProvider({ children }) {
-  const [workshopsState, setWorkshopsState] = useState(initialWorkshops);
-  const [companiesState, setCompaniesState] = useState(initialCompanies);
-  const [companyWorkshopLinksState, setCompanyWorkshopLinksState] = useState(
-    initialCompanyWorkshopLinks
-  );
-  const [warehousesState, setWarehousesState] = useState(initialWarehouses);
-  const [usersState, setUsersState] = useState(initialUsers);
-  const [trucksState, setTrucksState] = useState(initialTrucks);
-  const [issuesState, setIssuesState] = useState(initialIssues);
-  const [jobsState, setJobsState] = useState(initialJobs);
-  const [currentUserId, setCurrentUserId] = useState(null);
+  const [appState, setAppState] = useState(() => createSeededAppState());
   const [feedback, setFeedback] = useState(null);
+  const [isHydrated, setIsHydrated] = useState(false);
 
-  const currentUser = usersState.find((user) => user.id === currentUserId) || null;
-  const currentCompany =
-    companiesState.find((company) => company.id === currentUser?.companyId) || null;
-  const currentWorkshop =
-    workshopsState.find((workshop) => workshop.id === currentUser?.workshopId) || null;
-  const isManager = currentUser?.role === ROLES.MANAGER;
-  const isWorkshopUser = Boolean(currentUser) && currentUser.role !== ROLES.MANAGER;
+  useEffect(() => {
+    let isActive = true;
+
+    async function hydrateState() {
+      try {
+        const persistedState = await loadPersistedAppState();
+
+        if (!isActive) {
+          return;
+        }
+
+        setAppState(normalizeAppState(persistedState));
+      } catch (error) {
+        if (__DEV__) {
+          console.warn('Failed to hydrate Hauler app state.', error);
+        }
+      } finally {
+        if (isActive) {
+          setIsHydrated(true);
+        }
+      }
+    }
+
+    hydrateState();
+
+    return () => {
+      isActive = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!isHydrated) {
+      return;
+    }
+
+    savePersistedAppState(appState).catch((error) => {
+      if (__DEV__) {
+        console.warn('Failed to persist Hauler app state.', error);
+      }
+    });
+  }, [appState, isHydrated]);
 
   useEffect(() => {
     if (!feedback) {
@@ -224,20 +221,35 @@ export function AppProvider({ children }) {
     return () => clearTimeout(timeoutId);
   }, [feedback]);
 
-  const derivedData = useMemo(() => {
-    const usersById = mapById(usersState);
-    const workshopsById = mapById(workshopsState);
-    const companiesById = mapById(companiesState);
-    const warehousesById = mapById(warehousesState);
+  const currentUser = appState.users.find((user) => user.id === appState.currentUserId) || null;
+  const currentCompany = appState.companies.find((company) => company.id === currentUser?.companyId) || null;
+  const currentWorkshop =
+    appState.workshops.find((workshop) => workshop.id === currentUser?.workshopId) || null;
+  const isManager = currentUser?.role === ROLES.MANAGER;
+  const isWorkshopUser = Boolean(currentUser) && currentUser.role !== ROLES.MANAGER;
 
-    const trucksBase = trucksState.map((truck) => ({
+  const derivedData = useMemo(() => {
+    const usersById = mapById(appState.users);
+    const workshopsById = mapById(appState.workshops);
+    const companiesById = mapById(appState.companies);
+    const warehousesById = mapById(appState.warehouses);
+
+    const normalizedLinks = sortByDateDescending(appState.companyWorkshopLinks, 'createdAt').map(
+      (link) => ({
+        ...link,
+        workshop: workshopsById[link.workshopId] || null,
+        company: companiesById[link.companyId] || null,
+      })
+    );
+
+    const trucksBase = appState.trucks.map((truck) => ({
       ...truck,
       company: companiesById[truck.companyId] || null,
       warehouse: warehousesById[truck.warehouseId] || null,
     }));
     const trucksBaseById = mapById(trucksBase);
 
-    const jobsDetailedBase = sortByDateAscending(jobsState, 'scheduledDate').map((job) => ({
+    const jobsDetailedBase = sortByDateAscending(appState.jobs, 'scheduledDate').map((job) => ({
       ...job,
       truck: trucksBaseById[job.truckId] || null,
       warehouse: warehousesById[job.warehouseId] || null,
@@ -246,7 +258,7 @@ export function AppProvider({ children }) {
     }));
     const jobsDetailedBaseById = mapById(jobsDetailedBase);
 
-    const rawJobsByIssueId = jobsState.reduce((accumulator, job) => {
+    const rawJobsByIssueId = appState.jobs.reduce((accumulator, job) => {
       if (!accumulator[job.issueId]) {
         accumulator[job.issueId] = [];
       }
@@ -255,11 +267,11 @@ export function AppProvider({ children }) {
       return accumulator;
     }, {});
 
-    const issuesDetailed = sortByDateDescending(issuesState, 'createdAt').map((issue) => {
+    const issuesDetailed = sortByDateDescending(appState.issues, 'createdAt').map((issue) => {
       const truck = trucksBaseById[issue.truckId] || null;
       const reporter = usersById[issue.reportedBy] || null;
       const issueJobs = sortByDateDescending(rawJobsByIssueId[issue.id] || [], 'scheduledDate');
-      const currentJob = getCurrentJob(issueJobs);
+      const currentIssueJob = getCurrentJob(issueJobs);
 
       return {
         ...issue,
@@ -268,7 +280,7 @@ export function AppProvider({ children }) {
         company: truck?.company || null,
         warehouse: truck?.warehouse || null,
         jobs: issueJobs.map((job) => jobsDetailedBaseById[job.id] || job),
-        currentJob: currentJob ? jobsDetailedBaseById[currentJob.id] || currentJob : null,
+        currentJob: currentIssueJob ? jobsDetailedBaseById[currentIssueJob.id] || currentIssueJob : null,
       };
     });
     const issuesDetailedById = mapById(issuesDetailed);
@@ -277,6 +289,7 @@ export function AppProvider({ children }) {
       ...job,
       issue: issuesDetailedById[job.issueId] || null,
     }));
+
     const issuesByTruckId = issuesDetailed.reduce((accumulator, issue) => {
       if (!accumulator[issue.truckId]) {
         accumulator[issue.truckId] = [];
@@ -298,8 +311,6 @@ export function AppProvider({ children }) {
     const trucksDetailed = trucksBase.map((truck) => {
       const truckIssues = sortByDateDescending(issuesByTruckId[truck.id] || [], 'createdAt');
       const truckJobs = sortByDateDescending(jobsByTruckId[truck.id] || [], 'scheduledDate');
-      const currentIssue = getCurrentIssue(truckIssues);
-      const currentJob = getCurrentJob(truckJobs);
       const activeIssue =
         truckIssues.find((issue) => issue.status !== ISSUE_STATUS.RESOLVED) || null;
       const activeJob = truckJobs.find((job) => job.status !== JOB_STATUS.DONE) || null;
@@ -308,8 +319,8 @@ export function AppProvider({ children }) {
         ...truck,
         issues: truckIssues,
         jobs: truckJobs,
-        currentIssue,
-        currentJob,
+        currentIssue: getCurrentIssue(truckIssues),
+        currentJob: getCurrentJob(truckJobs),
         activeIssue,
         activeJob,
         latestIssue: truckIssues[0] || null,
@@ -320,88 +331,77 @@ export function AppProvider({ children }) {
     });
     const trucksDetailedById = mapById(trucksDetailed);
 
-    const linksDetailed = sortByDateDescending(companyWorkshopLinksState, 'createdAt').map(
-      (link) => ({
-        ...link,
-        workshop: workshopsById[link.workshopId] || null,
-        company: companiesById[link.companyId] || null,
-      })
-    );
-
-    const companiesDetailed = companiesState.map((company) => {
-      const companyWarehouses = warehousesState
+    const companiesDetailed = appState.companies.map((company) => {
+      const companyWarehouses = appState.warehouses
         .filter((warehouse) => warehouse.companyId === company.id)
         .map((warehouse) => ({
           ...warehouse,
           company,
         }));
       const companyTrucks = trucksDetailed.filter((truck) => truck.companyId === company.id);
-      const companyLinks = linksDetailed.filter((link) => link.companyId === company.id);
+      const companyLinks = normalizedLinks.filter((link) => link.companyId === company.id);
       const linkedWorkshops = companyLinks
         .filter((link) => link.status === LINK_STATUS.ACTIVE)
         .map((link) => workshopsById[link.workshopId])
         .filter(Boolean);
+      const setup = getCompanySetupStatus(company, companyWarehouses, companyTrucks, companyLinks.filter((link) => link.status === LINK_STATUS.ACTIVE));
 
       return {
         ...company,
-        ownerUsers: company.ownerUserIds.map((userId) => usersById[userId]).filter(Boolean),
-        managerUsers: company.managerUserIds.map((userId) => usersById[userId]).filter(Boolean),
+        ownerUsers: (company.ownerUserIds || []).map((userId) => usersById[userId]).filter(Boolean),
+        managerUsers: (company.managerUserIds || []).map((userId) => usersById[userId]).filter(Boolean),
+        links: companyLinks,
+        linkedWorkshopIds: linkedWorkshops.map((workshop) => workshop.id),
+        linkedWorkshops,
         warehouses: companyWarehouses,
         trucks: companyTrucks,
-        links: companyLinks,
-        linkedWorkshops,
+        setup,
       };
     });
     const companiesDetailedById = mapById(companiesDetailed);
 
-    const workshopsDetailed = workshopsState.map((workshop) => {
-      const workshopStaff = usersState.filter((user) => user.workshopId === workshop.id);
-      const workshopLinks = linksDetailed.filter((link) => link.workshopId === workshop.id);
+    const workshopsDetailed = appState.workshops.map((workshop) => {
+      const workshopStaff = appState.users.filter((user) => user.workshopId === workshop.id);
+      const workshopLinks = normalizedLinks.filter((link) => link.workshopId === workshop.id);
       const linkedCompanies = workshopLinks
         .filter((link) => link.status === LINK_STATUS.ACTIVE)
         .map((link) => companiesDetailedById[link.companyId])
         .filter(Boolean);
+      const setup = getWorkshopSetupStatus(workshop, workshopStaff, workshopLinks);
 
       return {
         ...workshop,
         ownerUser: usersById[workshop.ownerUserId] || null,
         staffUsers: workshopStaff,
+        staffUserIds: workshopStaff.map((user) => user.id),
         links: workshopLinks,
+        linkedCompanyIds: linkedCompanies.map((company) => company.id),
         linkedCompanies,
+        setup,
       };
     });
     const workshopsDetailedById = mapById(workshopsDetailed);
 
-    const currentCompanyDetailed = currentCompany
-      ? companiesDetailedById[currentCompany.id] || null
-      : null;
-    const currentWorkshopDetailed = currentWorkshop
-      ? workshopsDetailedById[currentWorkshop.id] || null
-      : null;
+    const currentCompanyDetailed = currentCompany ? companiesDetailedById[currentCompany.id] || null : null;
+    const currentWorkshopDetailed = currentWorkshop ? workshopsDetailedById[currentWorkshop.id] || null : null;
 
-    const visibleCompanyIds = getVisibleCompanyIds(
+    const visibleCompanyIds = getVisibleCompanyIds({
       currentUser,
-      currentWorkshopDetailed,
-      companyWorkshopLinksState
-    );
+      currentWorkshop: currentWorkshopDetailed,
+      companyWorkshopLinks: appState.companyWorkshopLinks,
+    });
     const visibleCompanyIdSet = new Set(visibleCompanyIds);
 
-    const visibleWarehouses = warehousesState
+    const visibleWarehouses = appState.warehouses
       .filter((warehouse) => visibleCompanyIdSet.has(warehouse.companyId))
       .map((warehouse) => ({
         ...warehouse,
-        company: companiesById[warehouse.companyId] || null,
+        company: companiesDetailedById[warehouse.companyId] || null,
       }));
-    const visibleTrucks = trucksDetailed.filter((truck) =>
-      visibleCompanyIdSet.has(truck.companyId)
-    );
+    const visibleTrucks = trucksDetailed.filter((truck) => visibleCompanyIdSet.has(truck.companyId));
     const visibleTruckIdSet = new Set(visibleTrucks.map((truck) => truck.id));
     const visibleIssues = issuesDetailed.filter((issue) => visibleTruckIdSet.has(issue.truckId));
     const visibleJobs = jobsDetailed.filter((job) => visibleTruckIdSet.has(job.truckId));
-
-    const visibleTrucksById = mapById(visibleTrucks);
-    const visibleIssuesById = mapById(visibleIssues);
-    const visibleJobsById = mapById(visibleJobs);
 
     const scheduleDays = visibleJobs.reduce((accumulator, job) => {
       const existingDay = accumulator.find((item) => item.date === job.scheduledDate);
@@ -419,26 +419,12 @@ export function AppProvider({ children }) {
       return accumulator;
     }, []);
 
-    const fleetSummary = {
-      total: visibleTrucks.length,
-      outOfService: visibleTrucks.filter(
-        (truck) => truck.status === TRUCK_STATUS.OUT_OF_SERVICE
-      ).length,
-      inRepair: visibleTrucks.filter((truck) => truck.status === TRUCK_STATUS.IN_REPAIR).length,
-      backInService: visibleTrucks.filter(
-        (truck) => truck.status === TRUCK_STATUS.BACK_IN_SERVICE
-      ).length,
-      attentionNow: visibleTrucks.filter((truck) => truck.activeIssue || truck.activeJob).length,
-    };
-
     const currentCompanyInvitations = currentCompanyDetailed
       ? currentCompanyDetailed.links.filter((link) => link.status === LINK_STATUS.INVITED)
       : [];
     const currentWorkshopLinks = currentWorkshopDetailed?.links || [];
     const currentWorkshopStaff = currentWorkshopDetailed?.staffUsers || [];
-    const currentWorkshopMechanics = currentWorkshopStaff.filter(
-      (user) => user.role === ROLES.MECHANIC
-    );
+    const currentWorkshopMechanics = currentWorkshopStaff.filter((user) => user.role === ROLES.MECHANIC);
     const availableCompaniesForInvite = currentWorkshopDetailed
       ? companiesDetailed.filter((company) => {
           const hasExistingLink = currentWorkshopDetailed.links.some(
@@ -451,26 +437,34 @@ export function AppProvider({ children }) {
         })
       : [];
 
+    const fleetSummary = {
+      total: visibleTrucks.length,
+      outOfService: visibleTrucks.filter((truck) => truck.status === TRUCK_STATUS.OUT_OF_SERVICE).length,
+      inRepair: visibleTrucks.filter((truck) => truck.status === TRUCK_STATUS.IN_REPAIR).length,
+      backInService: visibleTrucks.filter((truck) => truck.status === TRUCK_STATUS.BACK_IN_SERVICE).length,
+      attentionNow: visibleTrucks.filter((truck) => truck.activeIssue || truck.activeJob).length,
+    };
+
     return {
-      users: usersState,
+      users: appState.users,
       usersById,
       companies: companiesDetailed,
       companiesById: companiesDetailedById,
       workshops: workshopsDetailed,
       workshopsById: workshopsDetailedById,
       warehouses: visibleWarehouses,
-      allWarehouses: warehousesState.map((warehouse) => ({
+      allWarehouses: appState.warehouses.map((warehouse) => ({
         ...warehouse,
-        company: companiesById[warehouse.companyId] || null,
+        company: companiesDetailedById[warehouse.companyId] || null,
       })),
       trucks: visibleTrucks,
       allTrucksById: trucksDetailedById,
-      visibleTrucksById,
+      visibleTrucksById: mapById(visibleTrucks),
       issues: visibleIssues,
-      visibleIssuesById,
+      visibleIssuesById: mapById(visibleIssues),
       jobs: visibleJobs,
-      visibleJobsById,
-      links: linksDetailed,
+      visibleJobsById: mapById(visibleJobs),
+      links: normalizedLinks,
       scheduleDays,
       fleetSummary,
       currentCompany: currentCompanyDetailed,
@@ -481,19 +475,7 @@ export function AppProvider({ children }) {
       currentWorkshopMechanics,
       availableCompaniesForInvite,
     };
-  }, [
-    companiesState,
-    companyWorkshopLinksState,
-    currentCompany,
-    currentUser,
-    currentWorkshop,
-    issuesState,
-    jobsState,
-    trucksState,
-    usersState,
-    warehousesState,
-    workshopsState,
-  ]);
+  }, [appState, currentCompany, currentUser, currentWorkshop]);
 
   const dismissFeedback = () => {
     setFeedback(null);
@@ -508,12 +490,42 @@ export function AppProvider({ children }) {
   };
 
   const loginAsUser = (userId) => {
-    setCurrentUserId(userId);
+    setAppState((currentState) =>
+      normalizeAppState({
+        ...currentState,
+        currentUserId: userId,
+      })
+    );
   };
 
   const logout = () => {
-    setCurrentUserId(null);
+    setAppState((currentState) =>
+      normalizeAppState({
+        ...currentState,
+        currentUserId: null,
+      })
+    );
     dismissFeedback();
+  };
+
+  const resetDemoData = async () => {
+    const resetState = createSeededAppState();
+
+    setAppState(resetState);
+    dismissFeedback();
+    showFeedback({
+      message: 'Demo data reset to the seeded beta state.',
+      tone: 'info',
+    });
+
+    try {
+      await resetPersistedAppState();
+      await savePersistedAppState(resetState);
+    } catch (error) {
+      if (__DEV__) {
+        console.warn('Failed to reset Hauler app state.', error);
+      }
+    }
   };
 
   const hasActiveWorkshopAccess = (companyId) => {
@@ -521,7 +533,7 @@ export function AppProvider({ children }) {
       return false;
     }
 
-    return companyWorkshopLinksState.some(
+    return appState.companyWorkshopLinks.some(
       (link) =>
         link.workshopId === currentWorkshop.id &&
         link.companyId === companyId &&
@@ -534,18 +546,21 @@ export function AppProvider({ children }) {
       return;
     }
 
-    setCompaniesState((currentCompanies) =>
-      currentCompanies.map((company) =>
-        company.id === currentCompany.id
-          ? {
-              ...company,
-              name: name.trim(),
-              address: address.trim(),
-              contactName: contactName.trim(),
-              contactPhone: contactPhone.trim(),
-            }
-          : company
-      )
+    setAppState((currentState) =>
+      normalizeAppState({
+        ...currentState,
+        companies: currentState.companies.map((company) =>
+          company.id === currentCompany.id
+            ? {
+                ...company,
+                name: name.trim(),
+                address: address.trim(),
+                contactName: contactName.trim(),
+                contactPhone: contactPhone.trim(),
+              }
+            : company
+        ),
+      })
     );
 
     showFeedback({
@@ -565,7 +580,12 @@ export function AppProvider({ children }) {
       address: address.trim(),
     };
 
-    setWarehousesState((currentWarehouses) => [...currentWarehouses, newWarehouse]);
+    setAppState((currentState) =>
+      normalizeAppState({
+        ...currentState,
+        warehouses: [...currentState.warehouses, newWarehouse],
+      })
+    );
     showFeedback({
       message: `${newWarehouse.name} added to ${currentCompany.name}.`,
     });
@@ -586,6 +606,12 @@ export function AppProvider({ children }) {
       return null;
     }
 
+    const warehouse = appState.warehouses.find((item) => item.id === warehouseId);
+
+    if (!warehouse || warehouse.companyId !== currentCompany.id) {
+      return null;
+    }
+
     const newTruck = {
       id: createEntityId('truck'),
       unitNumber: unitNumber.trim(),
@@ -599,7 +625,12 @@ export function AppProvider({ children }) {
       notes: notes.trim(),
     };
 
-    setTrucksState((currentTrucks) => [...currentTrucks, newTruck]);
+    setAppState((currentState) =>
+      normalizeAppState({
+        ...currentState,
+        trucks: [...currentState.trucks, newTruck],
+      })
+    );
     showFeedback({
       message: `Truck ${newTruck.unitNumber} added to ${currentCompany.name}.`,
     });
@@ -612,16 +643,19 @@ export function AppProvider({ children }) {
       return;
     }
 
-    setWorkshopsState((currentWorkshops) =>
-      currentWorkshops.map((workshop) =>
-        workshop.id === currentWorkshop.id
-          ? {
-              ...workshop,
-              name: name.trim(),
-              address: address.trim(),
-            }
-          : workshop
-      )
+    setAppState((currentState) =>
+      normalizeAppState({
+        ...currentState,
+        workshops: currentState.workshops.map((workshop) =>
+          workshop.id === currentWorkshop.id
+            ? {
+                ...workshop,
+                name: name.trim(),
+                address: address.trim(),
+              }
+            : workshop
+        ),
+      })
     );
 
     showFeedback({
@@ -642,18 +676,12 @@ export function AppProvider({ children }) {
       workshopId: currentWorkshop.id,
     };
 
-    setUsersState((currentUsers) => [...currentUsers, newUser]);
-    setWorkshopsState((currentWorkshops) =>
-      currentWorkshops.map((workshop) =>
-        workshop.id === currentWorkshop.id
-          ? {
-              ...workshop,
-              staffUserIds: addIdToList(workshop.staffUserIds, newUser.id),
-            }
-          : workshop
-      )
+    setAppState((currentState) =>
+      normalizeAppState({
+        ...currentState,
+        users: [...currentState.users, newUser],
+      })
     );
-
     showFeedback({
       message: `${newUser.name} added to ${currentWorkshop.name}.`,
     });
@@ -666,8 +694,8 @@ export function AppProvider({ children }) {
       return null;
     }
 
-    const company = companiesState.find((item) => item.id === companyId);
-    const existingLink = companyWorkshopLinksState.find(
+    const company = appState.companies.find((item) => item.id === companyId);
+    const existingLink = appState.companyWorkshopLinks.find(
       (link) =>
         link.workshopId === currentWorkshop.id &&
         link.companyId === companyId &&
@@ -686,7 +714,12 @@ export function AppProvider({ children }) {
       createdAt: new Date().toISOString(),
     };
 
-    setCompanyWorkshopLinksState((currentLinks) => [...currentLinks, newLink]);
+    setAppState((currentState) =>
+      normalizeAppState({
+        ...currentState,
+        companyWorkshopLinks: [...currentState.companyWorkshopLinks, newLink],
+      })
+    );
     showFeedback({
       message: `Private workshop invite created for ${company.name}.`,
     });
@@ -699,45 +732,25 @@ export function AppProvider({ children }) {
       return;
     }
 
-    const link = companyWorkshopLinksState.find((item) => item.id === linkId);
-    const workshop = workshopsState.find((item) => item.id === link?.workshopId);
+    const link = appState.companyWorkshopLinks.find((item) => item.id === linkId);
+    const workshop = appState.workshops.find((item) => item.id === link?.workshopId);
 
     if (!link || link.companyId !== currentCompany.id || link.status !== LINK_STATUS.INVITED) {
       return;
     }
 
-    setCompanyWorkshopLinksState((currentLinks) =>
-      currentLinks.map((currentLink) =>
-        currentLink.id === linkId
-          ? {
-              ...currentLink,
-              status: LINK_STATUS.ACTIVE,
-            }
-          : currentLink
-      )
-    );
-    setCompaniesState((currentCompanies) =>
-      currentCompanies.map((company) =>
-        company.id === currentCompany.id
-          ? {
-              ...company,
-              linkedWorkshopIds: addIdToList(company.linkedWorkshopIds, link.workshopId),
-            }
-          : company
-      )
-    );
-    setWorkshopsState((currentWorkshops) =>
-      currentWorkshops.map((currentWorkshopItem) =>
-        currentWorkshopItem.id === link.workshopId
-          ? {
-              ...currentWorkshopItem,
-              linkedCompanyIds: addIdToList(
-                currentWorkshopItem.linkedCompanyIds,
-                currentCompany.id
-              ),
-            }
-          : currentWorkshopItem
-      )
+    setAppState((currentState) =>
+      normalizeAppState({
+        ...currentState,
+        companyWorkshopLinks: currentState.companyWorkshopLinks.map((currentLink) =>
+          currentLink.id === linkId
+            ? {
+                ...currentLink,
+                status: LINK_STATUS.ACTIVE,
+              }
+            : currentLink
+        ),
+      })
     );
 
     showFeedback({
@@ -750,7 +763,7 @@ export function AppProvider({ children }) {
       return null;
     }
 
-    const truck = trucksState.find((item) => item.id === truckId);
+    const truck = appState.trucks.find((item) => item.id === truckId);
 
     if (!truck || truck.companyId !== currentCompany.id) {
       return null;
@@ -767,21 +780,23 @@ export function AppProvider({ children }) {
       status: ISSUE_STATUS.REPORTED,
     };
 
-    const activeWorkshopLink = companyWorkshopLinksState.find(
-      (link) =>
-        link.companyId === currentCompany.id && link.status === LINK_STATUS.ACTIVE
+    const activeWorkshopLink = appState.companyWorkshopLinks.find(
+      (link) => link.companyId === currentCompany.id && link.status === LINK_STATUS.ACTIVE
     );
 
-    setIssuesState((currentIssues) => [newIssue, ...currentIssues]);
-    setTrucksState((currentTrucks) =>
-      currentTrucks.map((currentTruck) =>
-        currentTruck.id === truckId
-          ? {
-              ...currentTruck,
-              status: TRUCK_STATUS.OUT_OF_SERVICE,
-            }
-          : currentTruck
-      )
+    setAppState((currentState) =>
+      normalizeAppState({
+        ...currentState,
+        issues: [newIssue, ...currentState.issues],
+        trucks: currentState.trucks.map((currentTruck) =>
+          currentTruck.id === truckId
+            ? {
+                ...currentTruck,
+                status: TRUCK_STATUS.OUT_OF_SERVICE,
+              }
+            : currentTruck
+        ),
+      })
     );
     showFeedback({
       message: activeWorkshopLink
@@ -799,15 +814,20 @@ export function AppProvider({ children }) {
     scheduledDate,
     estimatedReturnDate,
   }) => {
-    const issue = issuesState.find((item) => item.id === issueId);
-    const truck = trucksState.find((item) => item.id === issue?.truckId);
-    const assignedMechanic = usersState.find((user) => user.id === assignedMechanicId);
+    const issue = appState.issues.find((item) => item.id === issueId);
+    const truck = appState.trucks.find((item) => item.id === issue?.truckId);
+    const assignedMechanic = appState.users.find((user) => user.id === assignedMechanicId);
+    const warehouse = appState.warehouses.find((item) => item.id === warehouseId);
 
     if (!issue || !truck || issue.status !== ISSUE_STATUS.REPORTED || !isWorkshopUser) {
       return null;
     }
 
     if (!hasActiveWorkshopAccess(truck.companyId)) {
+      return null;
+    }
+
+    if (!warehouse || warehouse.companyId !== truck.companyId) {
       return null;
     }
 
@@ -826,27 +846,28 @@ export function AppProvider({ children }) {
       status: JOB_STATUS.SCHEDULED,
     };
 
-    setJobsState((currentJobs) => [...currentJobs, newJob]);
-    setIssuesState((currentIssues) =>
-      currentIssues.map((currentIssue) =>
-        currentIssue.id === issueId
-          ? {
-              ...currentIssue,
-              status: ISSUE_STATUS.ASSIGNED,
-            }
-          : currentIssue
-      )
-    );
-    setTrucksState((currentTrucks) =>
-      currentTrucks.map((currentTruck) =>
-        currentTruck.id === issue.truckId
-          ? {
-              ...currentTruck,
-              warehouseId,
-              status: TRUCK_STATUS.OUT_OF_SERVICE,
-            }
-          : currentTruck
-      )
+    setAppState((currentState) =>
+      normalizeAppState({
+        ...currentState,
+        jobs: [...currentState.jobs, newJob],
+        issues: currentState.issues.map((currentIssue) =>
+          currentIssue.id === issueId
+            ? {
+                ...currentIssue,
+                status: ISSUE_STATUS.ASSIGNED,
+              }
+            : currentIssue
+        ),
+        trucks: currentState.trucks.map((currentTruck) =>
+          currentTruck.id === issue.truckId
+            ? {
+                ...currentTruck,
+                warehouseId,
+                status: TRUCK_STATUS.OUT_OF_SERVICE,
+              }
+            : currentTruck
+        ),
+      })
     );
     showFeedback({
       message: `Truck ${truck.unitNumber} assigned to workshop schedule.`,
@@ -856,21 +877,24 @@ export function AppProvider({ children }) {
   };
 
   const updateTruckStatus = (truckId, status) => {
-    setTrucksState((currentTrucks) =>
-      currentTrucks.map((truck) =>
-        truck.id === truckId
-          ? {
-              ...truck,
-              status,
-            }
-          : truck
-      )
+    setAppState((currentState) =>
+      normalizeAppState({
+        ...currentState,
+        trucks: currentState.trucks.map((truck) =>
+          truck.id === truckId
+            ? {
+                ...truck,
+                status,
+              }
+            : truck
+        ),
+      })
     );
   };
 
   const updateJobStatus = (jobId, status) => {
-    const targetJob = jobsState.find((job) => job.id === jobId);
-    const targetTruck = trucksState.find((truck) => truck.id === targetJob?.truckId);
+    const targetJob = appState.jobs.find((job) => job.id === jobId);
+    const targetTruck = appState.trucks.find((truck) => truck.id === targetJob?.truckId);
 
     if (!targetJob || !targetTruck || !isWorkshopUser) {
       return;
@@ -880,32 +904,50 @@ export function AppProvider({ children }) {
       return;
     }
 
-    setJobsState((currentJobs) =>
-      currentJobs.map((job) =>
-        job.id === jobId
-          ? {
-              ...job,
-              status,
-            }
-          : job
-      )
+    setAppState((currentState) =>
+      normalizeAppState({
+        ...currentState,
+        jobs: currentState.jobs.map((job) =>
+          job.id === jobId
+            ? {
+                ...job,
+                status,
+              }
+            : job
+        ),
+        trucks:
+          status === JOB_STATUS.IN_PROGRESS || status === JOB_STATUS.DONE
+            ? currentState.trucks.map((truck) =>
+                truck.id === targetJob.truckId
+                  ? {
+                      ...truck,
+                      status:
+                        status === JOB_STATUS.IN_PROGRESS
+                          ? TRUCK_STATUS.IN_REPAIR
+                          : TRUCK_STATUS.BACK_IN_SERVICE,
+                    }
+                  : truck
+              )
+            : currentState.trucks,
+      })
     );
 
     if (status === JOB_STATUS.IN_PROGRESS) {
-      updateTruckStatus(targetJob.truckId, TRUCK_STATUS.IN_REPAIR);
       showFeedback({
         message: `Repair started for Truck ${targetTruck.unitNumber}.`,
       });
     }
 
     if (status === JOB_STATUS.DONE) {
-      updateTruckStatus(targetJob.truckId, TRUCK_STATUS.BACK_IN_SERVICE);
+      showFeedback({
+        message: `Repair completed for Truck ${targetTruck.unitNumber}.`,
+      });
     }
   };
 
   const resolveIssue = (issueId) => {
-    const targetIssue = issuesState.find((issue) => issue.id === issueId);
-    const targetTruck = trucksState.find((truck) => truck.id === targetIssue?.truckId);
+    const targetIssue = appState.issues.find((issue) => issue.id === issueId);
+    const targetTruck = appState.trucks.find((truck) => truck.id === targetIssue?.truckId);
 
     if (!targetIssue || !targetTruck || !isWorkshopUser) {
       return;
@@ -915,34 +957,42 @@ export function AppProvider({ children }) {
       return;
     }
 
-    setIssuesState((currentIssues) =>
-      currentIssues.map((issue) =>
-        issue.id === issueId
-          ? {
-              ...issue,
-              status: ISSUE_STATUS.RESOLVED,
-            }
-          : issue
-      )
+    setAppState((currentState) =>
+      normalizeAppState({
+        ...currentState,
+        issues: currentState.issues.map((issue) =>
+          issue.id === issueId
+            ? {
+                ...issue,
+                status: ISSUE_STATUS.RESOLVED,
+              }
+            : issue
+        ),
+        jobs: currentState.jobs.map((job) =>
+          job.issueId === issueId
+            ? {
+                ...job,
+                status: JOB_STATUS.DONE,
+              }
+            : job
+        ),
+        trucks: currentState.trucks.map((truck) =>
+          truck.id === targetIssue.truckId
+            ? {
+                ...truck,
+                status: TRUCK_STATUS.BACK_IN_SERVICE,
+              }
+            : truck
+        ),
+      })
     );
-    setJobsState((currentJobs) =>
-      currentJobs.map((job) =>
-        job.issueId === issueId
-          ? {
-              ...job,
-              status: JOB_STATUS.DONE,
-            }
-          : job
-      )
-    );
-    updateTruckStatus(targetIssue.truckId, TRUCK_STATUS.BACK_IN_SERVICE);
     showFeedback({
       message: `Repair completed for Truck ${targetTruck.unitNumber}. Back in service.`,
     });
   };
 
   const completeJobWorkflow = (jobId) => {
-    const targetJob = jobsState.find((job) => job.id === jobId);
+    const targetJob = appState.jobs.find((job) => job.id === jobId);
 
     if (!targetJob || !isWorkshopUser) {
       return;
@@ -980,16 +1030,20 @@ export function AppProvider({ children }) {
     currentCompanyWarehouses: derivedData.currentCompany?.warehouses || [],
     currentCompanyLinkedWorkshops: derivedData.currentCompany?.linkedWorkshops || [],
     currentWorkshopLinkedCompanies: derivedData.currentWorkshop?.linkedCompanies || [],
+    currentCompanySetup: derivedData.currentCompany?.setup || null,
+    currentWorkshopSetup: derivedData.currentWorkshop?.setup || null,
     availableCompaniesForInvite: derivedData.availableCompaniesForInvite,
     mechanics: derivedData.currentWorkshopMechanics,
     feedback,
     isAuthenticated: Boolean(currentUser),
+    isHydrated,
     isManager,
     isWorkshopUser,
     dismissFeedback,
     showFeedback,
     loginAsUser,
     logout,
+    resetDemoData,
     updateCompanyProfile,
     addWarehouse,
     addTruck,

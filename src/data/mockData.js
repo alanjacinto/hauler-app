@@ -8,24 +8,21 @@ import {
   TRUCK_STATUS,
 } from '../utils/constants';
 
-export const workshops = [
+const seedWorkshops = [
   {
     id: 'workshop-1',
     name: 'BlueLine Diesel Service',
     ownerUserId: 'user-3',
-    staffUserIds: ['user-3', 'user-4', 'user-5', 'user-6'],
-    linkedCompanyIds: ['company-1', 'company-2', 'company-3'],
     address: '88 Harbor Repair Way, Oakland, CA',
   },
 ];
 
-export const companies = [
+const seedCompanies = [
   {
     id: 'company-1',
     name: 'Northstar Logistics',
     ownerUserIds: ['user-1'],
     managerUserIds: ['user-1'],
-    linkedWorkshopIds: ['workshop-1'],
     address: '1450 Maritime St, Oakland, CA',
     contactName: 'Daniel Cruz',
     contactPhone: '(510) 555-0182',
@@ -35,7 +32,6 @@ export const companies = [
     name: 'Bay Freight',
     ownerUserIds: ['user-2'],
     managerUserIds: ['user-2'],
-    linkedWorkshopIds: ['workshop-1'],
     address: '1985 Williams St, San Leandro, CA',
     contactName: 'Maya Foster',
     contactPhone: '(510) 555-0119',
@@ -45,7 +41,6 @@ export const companies = [
     name: 'Summit Parcel',
     ownerUserIds: ['user-7'],
     managerUserIds: ['user-7'],
-    linkedWorkshopIds: ['workshop-1'],
     address: '420 Harbour Way, Richmond, CA',
     contactName: 'Priya Nadeem',
     contactPhone: '(510) 555-0144',
@@ -55,14 +50,13 @@ export const companies = [
     name: 'Canyon Materials',
     ownerUserIds: ['user-8'],
     managerUserIds: ['user-8'],
-    linkedWorkshopIds: [],
     address: '',
     contactName: '',
     contactPhone: '',
   },
 ];
 
-export const companyWorkshopLinks = [
+const seedCompanyWorkshopLinks = [
   {
     id: 'link-1',
     workshopId: 'workshop-1',
@@ -86,7 +80,7 @@ export const companyWorkshopLinks = [
   },
 ];
 
-export const warehouses = [
+const seedWarehouses = [
   {
     id: 'warehouse-1',
     companyId: 'company-1',
@@ -113,7 +107,7 @@ export const warehouses = [
   },
 ];
 
-export const users = [
+const seedUsers = [
   {
     id: 'user-1',
     role: ROLES.MANAGER,
@@ -172,7 +166,7 @@ export const users = [
   },
 ];
 
-export const trucks = [
+const seedTrucks = [
   {
     id: 'truck-1',
     unitNumber: '231',
@@ -259,7 +253,7 @@ export const trucks = [
   },
 ];
 
-export const issues = [
+const seedIssues = [
   {
     id: 'issue-1',
     truckId: 'truck-1',
@@ -322,7 +316,7 @@ export const issues = [
   },
 ];
 
-export const jobs = [
+const seedJobs = [
   {
     id: 'job-1',
     issueId: 'issue-1',
@@ -374,3 +368,32 @@ export const jobs = [
     status: JOB_STATUS.DONE,
   },
 ];
+
+function clone(value) {
+  return JSON.parse(JSON.stringify(value));
+}
+
+export function createMockState() {
+  return {
+    workshops: clone(seedWorkshops),
+    companies: clone(seedCompanies),
+    companyWorkshopLinks: clone(seedCompanyWorkshopLinks),
+    warehouses: clone(seedWarehouses),
+    users: clone(seedUsers),
+    trucks: clone(seedTrucks),
+    issues: clone(seedIssues),
+    jobs: clone(seedJobs),
+    currentUserId: null,
+  };
+}
+
+const mockState = createMockState();
+
+export const workshops = mockState.workshops;
+export const companies = mockState.companies;
+export const companyWorkshopLinks = mockState.companyWorkshopLinks;
+export const warehouses = mockState.warehouses;
+export const users = mockState.users;
+export const trucks = mockState.trucks;
+export const issues = mockState.issues;
+export const jobs = mockState.jobs;

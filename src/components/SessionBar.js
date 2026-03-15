@@ -1,4 +1,4 @@
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Alert, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useAppData } from '../context/AppContext';
 import colors from '../theme/colors';
 
@@ -10,11 +10,29 @@ export default function SessionBar() {
     currentWorkshop,
     isManager,
     logout,
+    resetDemoData,
   } = useAppData();
 
   if (!currentUser) {
     return null;
   }
+
+  const confirmReset = () => {
+    Alert.alert(
+      'Reset demo data?',
+      'This clears saved progress on this device and returns Hauler to the seeded beta state.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Reset',
+          style: 'destructive',
+          onPress: () => {
+            resetDemoData();
+          },
+        },
+      ]
+    );
+  };
 
   return (
     <View style={styles.container}>
@@ -29,9 +47,15 @@ export default function SessionBar() {
         </Text>
       </View>
 
-      <Pressable style={styles.button} onPress={logout}>
-        <Text style={styles.buttonText}>Switch</Text>
-      </Pressable>
+      <View style={styles.actions}>
+        <Pressable style={styles.secondaryButton} onPress={confirmReset}>
+          <Text style={styles.secondaryButtonText}>Reset</Text>
+        </Pressable>
+
+        <Pressable style={styles.button} onPress={logout}>
+          <Text style={styles.buttonText}>Switch</Text>
+        </Pressable>
+      </View>
     </View>
   );
 }
@@ -62,6 +86,21 @@ const styles = StyleSheet.create({
     color: colors.textMuted,
     fontSize: 12,
     fontWeight: '600',
+  },
+  actions: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  secondaryButton: {
+    backgroundColor: colors.surfaceMuted,
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+  },
+  secondaryButtonText: {
+    color: colors.warning,
+    fontSize: 12,
+    fontWeight: '800',
   },
   button: {
     backgroundColor: colors.surfaceMuted,

@@ -1,4 +1,4 @@
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAppData } from '../context/AppContext';
 import colors from '../theme/colors';
@@ -23,7 +23,7 @@ const ROLE_COPY = {
 };
 
 export default function SessionSelectionScreen() {
-  const { companies, loginAsUser, sessionUsers, workshops } = useAppData();
+  const { companies, loginAsUser, resetDemoData, sessionUsers, workshops } = useAppData();
 
   const companiesById = companies.reduce((accumulator, company) => {
     accumulator[company.id] = company;
@@ -35,6 +35,23 @@ export default function SessionSelectionScreen() {
     return accumulator;
   }, {});
 
+  const confirmReset = () => {
+    Alert.alert(
+      'Reset demo data?',
+      'This clears saved local progress and returns the app to the original seeded beta state.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Reset',
+          style: 'destructive',
+          onPress: () => {
+            resetDemoData();
+          },
+        },
+      ]
+    );
+  };
+
   return (
     <SafeAreaView style={styles.safeArea}>
       <ScrollView
@@ -43,12 +60,21 @@ export default function SessionSelectionScreen() {
         showsVerticalScrollIndicator={false}
       >
         <View style={styles.hero}>
-          <Text style={styles.eyebrow}>Hauler Network MVP</Text>
+          <Text style={styles.eyebrow}>Hauler Private Beta</Text>
           <Text style={styles.title}>Choose a demo session</Text>
           <Text style={styles.subtitle}>
-            This build now models private workshop-company relationships. Workshops only see linked
-            fleets, and companies keep ownership of their own fleet records.
+            This build now restores local progress, keeps workshop links private, and carries the
+            organization setup state forward between launches.
           </Text>
+        </View>
+
+        <View style={styles.heroMeta}>
+          <View style={styles.infoChip}>
+            <Text style={styles.infoChipText}>Persistent local beta state</Text>
+          </View>
+          <Pressable style={styles.resetButton} onPress={confirmReset}>
+            <Text style={styles.resetButtonText}>Reset demo data</Text>
+          </Pressable>
         </View>
 
         <View style={styles.cards}>
@@ -56,6 +82,7 @@ export default function SessionSelectionScreen() {
             const roleCopy = ROLE_COPY[user.role];
             const company = user.companyId ? companiesById[user.companyId] : null;
             const workshop = user.workshopId ? workshopsById[user.workshopId] : null;
+            const setup = company?.setup || workshop?.setup || null;
             const orgMeta = company
               ? `${company.name} • ${company.trucks.length} trucks`
               : workshop
@@ -84,6 +111,25 @@ export default function SessionSelectionScreen() {
                   <Text style={styles.orgLabel}>Organization context</Text>
                   <Text style={styles.orgText}>{orgMeta}</Text>
                 </View>
+
+                {setup ? (
+                  <View style={styles.setupCard}>
+                    <View style={styles.setupTop}>
+                      <Text style={styles.setupLabel}>
+                        Setup {setup.completedCount}/{setup.totalCount}
+                      </Text>
+                      <Text
+                        style={[
+                          styles.setupState,
+                          setup.isComplete ? styles.setupStateReady : styles.setupStatePending,
+                        ]}
+                      >
+                        {setup.isComplete ? 'Ready' : 'Needs setup'}
+                      </Text>
+                    </View>
+                    <Text style={styles.setupCopy}>{setup.nextStep}</Text>
+                  </View>
+                ) : null}
 
                 <View style={styles.footerRow}>
                   <Text style={styles.footerLabel}>
@@ -135,6 +181,36 @@ const styles = StyleSheet.create({
     color: colors.textMuted,
     fontSize: 15,
     lineHeight: 22,
+  },
+  heroMeta: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    gap: 12,
+  },
+  infoChip: {
+    backgroundColor: colors.primaryMuted,
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: colors.primary,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+  },
+  infoChipText: {
+    color: colors.text,
+    fontSize: 11,
+    fontWeight: '800',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  resetButton: {
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+  },
+  resetButtonText: {
+    color: colors.warning,
+    fontSize: 12,
+    fontWeight: '800',
   },
   cards: {
     gap: 14,
@@ -201,6 +277,42 @@ const styles = StyleSheet.create({
     color: colors.text,
     fontSize: 14,
     lineHeight: 20,
+  },
+  setupCard: {
+    backgroundColor: colors.overlay,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: colors.border,
+    padding: 14,
+    gap: 8,
+  },
+  setupTop: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    gap: 10,
+  },
+  setupLabel: {
+    color: colors.text,
+    fontSize: 13,
+    fontWeight: '800',
+  },
+  setupState: {
+    fontSize: 11,
+    fontWeight: '800',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  setupStateReady: {
+    color: colors.success,
+  },
+  setupStatePending: {
+    color: colors.warning,
+  },
+  setupCopy: {
+    color: colors.textMuted,
+    fontSize: 13,
+    lineHeight: 19,
   },
   footerRow: {
     flexDirection: 'row',
